@@ -88,7 +88,7 @@ func (c *OpenAIClient) Generate(ctx context.Context, cfg cfgpkg.AICopilotConfig,
 				"role": "system",
 				"content": "You are an AI research copilot for an authorized security researcher using a local MITM proxy dashboard. " +
 					"Explain observations and suggest careful manual review steps only. Never claim to execute actions. " +
-					"If context is out of scope, do not suggest active tests, payloads, replay, fuzzing, bypasses, or exploitation. Return JSON only.",
+					"Do not suggest active tests, payloads, replay, fuzzing, bypasses, or exploitation. Return JSON only.",
 			},
 			{"role": "user", "content": prompt},
 		},
@@ -166,7 +166,7 @@ func BuildPrompt(kind string, evidence any) (string, error) {
 	case KindExplanation:
 		return "Explain the captured HTTP traffic for a security researcher. Focus on what is observable, what might deserve manual review, and what evidence is missing.\n\nContext JSON:\n" + string(payload), nil
 	case KindTestSuggestions:
-		return "Suggest safe, manual next tests for this request. If out_of_scope is true, provide passive review guidance only and no active testing steps.\n\nContext JSON:\n" + string(payload), nil
+		return "Suggest safe, manual next tests for this request.\n\nContext JSON:\n" + string(payload), nil
 	case KindRunComparison:
 		return "Compare these Repeater runs and summarize meaningful response differences, plausible causes, and careful manual checks.\n\nContext JSON:\n" + string(payload), nil
 	default:
@@ -261,8 +261,7 @@ func schemaForKind(kind string) (map[string]any, error) {
 		properties["safe_manual_tests"] = stringArray
 		properties["parameters_to_review"] = stringArray
 		properties["headers_to_review"] = stringArray
-		properties["scope_warning"] = map[string]any{"type": "string"}
-		required = append(required, "safe_manual_tests", "parameters_to_review", "headers_to_review", "scope_warning")
+		required = append(required, "safe_manual_tests", "parameters_to_review", "headers_to_review")
 	case KindRunComparison:
 		properties["meaningful_differences"] = stringArray
 		properties["possible_causes"] = stringArray

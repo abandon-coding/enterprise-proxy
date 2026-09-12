@@ -208,8 +208,6 @@ Initial dashboard/API coverage includes:
 - GET /api/traffic, GET /api/traffic/stats, GET /api/traffic/{id}, GET /api/traffic/stream, DELETE /api/traffic, and POST /api/traffic/{id}/replay
 - GET /api/traffic/export?format=har for HAR-style export
 - GET/POST/PUT/DELETE /api/repeater/cases and POST /api/repeater/cases/{id}/send for saved editable replay cases
-- GET/POST/PUT/DELETE /api/scopes plus scope assignment endpoints for traffic and repeater cases
-- GET/POST/DELETE /api/pentest/maps plus endpoint clone actions for passive target maps
 - GET/POST/PUT/DELETE /api/proxy-auth/users and /api/proxy-acl/rules plus POST /api/proxy-acl/test for proxy client access control
 - POST /api/ai/traffic/{id}/explain, POST /api/ai/traffic/{id}/suggest-tests, POST /api/ai/repeater/cases/{id}/suggest-tests, POST /api/ai/repeater/cases/{id}/compare-runs, and GET/POST/DELETE /api/ai/notes for AI research copilot notes
 - GET /api/certificates/ca, GET /api/certificates/ca/download, POST /api/certificates/ca/rotate, POST /api/certificates/ca/import, and GET /api/certificates/leaf
@@ -253,7 +251,7 @@ Only `http://` and `https://` upstream proxy URLs are supported in v1. If Basic 
 
 The dashboard's **Access Control** view manages client proxy users and ordered allow/deny ACL rules. Proxy users are stored in SQLite with bcrypt password hashes; plaintext passwords are accepted only when creating or resetting a user and are never returned by the API.
 
-Enable Basic proxy authentication through `proxy_auth` in `config.json` or the Settings view. When enabled, clients must send `Proxy-Authorization: Basic ...` unless loopback clients are exempt. ACL rules are evaluated by priority and can match username, source IP/CIDR, host or wildcard host, port or port range, method, and research scope. Empty matcher lists mean "any".
+Enable Basic proxy authentication through `proxy_auth` in `config.json` or the Settings view. When enabled, clients must send `Proxy-Authorization: Basic ...` unless loopback clients are exempt. ACL rules are evaluated by priority and can match username, source IP/CIDR, host or wildcard host, port or port range, and method. Empty matcher lists mean "any".
 
 `Proxy-Authorization` is stripped before forwarding, upstream chaining, traffic capture, cache lookup, threat scanning, and Repeater cloning. Captured traffic includes `proxy_user` attribution when available, and the Traffic search box can match proxy usernames.
 
@@ -265,25 +263,11 @@ Captured request bodies are only prefilled when `traffic_capture.store_bodies` w
 
 The legacy `POST /api/traffic/{id}/replay` endpoint remains available for one-shot replay, while the repeater is intended for repeatable request mutation and response comparison.
 
-### Pentest Toolkit
-
-The dashboard's **Pentest Toolkit** view builds passive target maps from captured traffic. Rebuilding a map analyzes only stored traffic for the selected scope, groups endpoints by normalized path, extracts query/body/cookie/header parameters, records reflected and interesting parameters, and adds passive hints such as missing security headers, cookie attribute gaps, permissive CORS, and verbose errors.
-
-Pentest maps are persisted in SQLite and can be deleted independently. The toolkit never sends requests, crawls, fuzzes, or mutates targets; endpoint evidence can be cloned into Repeater for manual testing.
-
-### Research Scopes
-
-The dashboard's **Scopes** view lets researchers define named target boundaries with host, URL substring, and optional method patterns. Enabled scopes are matched automatically when traffic is captured; matching flows, cloned Repeater cases, and threat scanner events receive a single `scope_id`.
-
-The global scope selector filters Traffic, Repeater, and Threat Scanner views across all traffic, a selected enabled scope, or out-of-scope items. Deleting a scope clears related `scope_id` values without deleting captured traffic, Repeater cases, runs, or threat data.
-
-Scope filters are available on `GET /api/traffic`, `GET /api/repeater/cases`, and `GET /api/threats/events` with `scope_id=<id>` or `scope_id=__out_of_scope__`. Add `include_out_of_scope=true` to include unscoped rows beside a selected scope.
-
 ### AI Research Copilot
 
-The dashboard's **AI Copilot** view stores AI-generated research notes linked to Traffic, Repeater cases, runs, scopes, or threat events. Traffic detail can ask the copilot to explain a request or suggest next manual tests; Repeater can suggest tests for a saved case or compare the latest two runs.
+The dashboard's **AI Copilot** view stores AI-generated research notes linked to Traffic, Repeater cases, runs, or threat events. Traffic detail can ask the copilot to explain a request or suggest next manual tests; Repeater can suggest tests for a saved case or compare the latest two runs.
 
-The copilot is advisory only. It never sends traffic, edits Repeater cases, changes scopes, changes settings, or purges data. Out-of-scope traffic can be explained, but active testing suggestions are intentionally withheld.
+The copilot is advisory only. It never sends traffic, edits Repeater cases, changes settings, or purges data.
 
 Enable it through `ai_copilot` in `config.json` or the Settings view:
 

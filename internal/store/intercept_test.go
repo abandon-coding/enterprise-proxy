@@ -119,14 +119,14 @@ func TestTrafficAdvancedSearchFields(t *testing.T) {
 	if err := st.RecordEvent(ctx, testTrafficCompleted("flow-1", 401)); err != nil {
 		t.Fatalf("record complete: %v", err)
 	}
-	flows, err := st.ListTrafficAdvanced(ctx, 10, 0, "", true, "host:example.test method:POST status:>=400 body:token")
+	flows, err := st.ListTrafficAdvanced(ctx, 10, 0, "host:example.test method:POST status:>=400 body:token")
 	if err != nil {
 		t.Fatalf("advanced search: %v", err)
 	}
 	if len(flows) != 1 || flows[0].ID != "flow-1" {
 		t.Fatalf("unexpected flows: %+v", flows)
 	}
-	if _, err := st.ListTrafficAdvanced(ctx, 10, 0, "", true, "status:nope"); err == nil {
+	if _, err := st.ListTrafficAdvanced(ctx, 10, 0, "status:nope"); err == nil {
 		t.Fatalf("expected invalid status query to fail")
 	}
 }

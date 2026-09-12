@@ -33,7 +33,6 @@ import (
 	"mitm-proxy/internal/deployments"
 	"mitm-proxy/internal/events"
 	"mitm-proxy/internal/intercept"
-	"mitm-proxy/internal/pentest"
 	"mitm-proxy/internal/policy"
 	"mitm-proxy/internal/store"
 	"mitm-proxy/internal/threats"
@@ -86,7 +85,6 @@ type repeaterCaseInput struct {
 	Headers      map[string][]string `json:"headers"`
 	Body         string              `json:"body"`
 	TimeoutMS    int                 `json:"timeout_ms"`
-	ScopeID      string              `json:"scope_id"`
 }
 
 func New(options Options) *Server {
@@ -121,11 +119,6 @@ func New(options Options) *Server {
 	apiMux.HandleFunc("/api/ai/repeater/cases/", s.handleAIRepeater)
 	apiMux.HandleFunc("/api/ai/notes", s.handleAINotes)
 	apiMux.HandleFunc("/api/ai/notes/", s.handleAINoteDetail)
-	apiMux.HandleFunc("/api/scopes", s.handleScopes)
-	apiMux.HandleFunc("/api/scopes/", s.handleScopeDetail)
-	apiMux.HandleFunc("/api/pentest/maps", s.handlePentestMaps)
-	apiMux.HandleFunc("/api/pentest/maps/rebuild", s.handlePentestMapRebuild)
-	apiMux.HandleFunc("/api/pentest/maps/", s.handlePentestMapDetail)
 	apiMux.HandleFunc("/metrics", s.handleMetrics)
 	apiMux.HandleFunc("/api/certificates/ca", s.handleCACertificate)
 	apiMux.HandleFunc("/api/certificates/ca/download", s.handleCACertificateDownload)
@@ -291,9 +284,8 @@ func (s *Server) handleTraffic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.options.Store != nil {
-		scopeID, includeOutOfScope := scopeFilter(r)
 		limit, offset := paginationParams(r, 200)
-		flows, err := s.options.Store.ListTrafficAdvanced(r.Context(), limit, offset, scopeID, includeOutOfScope, r.URL.Query().Get("q"))
+		flows, err := s.options.Store.ListTrafficAdvanced(r.Context(), limit, offset, r.URL.Query().Get("q"))
 		if err != nil {
 			var queryErr store.TrafficQueryError
 			if errors.As(err, &queryErr) {
@@ -326,11 +318,6 @@ func (s *Server) handleTrafficStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, stats)
 }
 
-func scopeFilter(r *http.Request) (string, bool) {
-	include := strings.EqualFold(r.URL.Query().Get("include_out_of_scope"), "true")
-	return strings.TrimSpace(r.URL.Query().Get("scope_id")), include
-}
-
 func paginationParams(r *http.Request, defaultLimit int) (int, int) {
 	limit := defaultLimit
 	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
@@ -351,289 +338,6 @@ func paginationParams(r *http.Request, defaultLimit int) (int, int) {
 		}
 	}
 	return limit, offset
-}
-
-func (s *Server) handleScopes(w http.ResponseWriter, r *http.Request) {
-	if s.options.Store == nil {
-		s.handleNotImplemented(w, r)
-		return
-	}
-	switch r.Method {
-	case http.MethodGet:
-		scopes, err := s.options.Store.ListResearchScopes(r.Context())
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		writeJSON(w, http.StatusOK, scopes)
-	case http.MethodPost:
-		var scope store.ResearchScope
-		if err := json.NewDecoder(r.Body).Decode(&scope); err != nil {
-			http.Error(w, "invalid JSON body", http.StatusBadRequest)
-			return
-		}
-		if strings.TrimSpace(scope.Name) == "" {
-			http.Error(w, "name is required", http.StatusBadRequest)
-			return
-		}
-		created, err := s.options.Store.CreateResearchScope(r.Context(), scope)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		s.audit(r, "scope.create", map[string]any{"id": created.ID, "name": created.Name})
-		writeJSON(w, http.StatusCreated, created)
-	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-func (s *Server) handlePentestMaps(w http.ResponseWriter, r *http.Request) {
-	if s.options.Store == nil {
-		s.handleNotImplemented(w, r)
-		return
-	}
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	scopeID, includeOutOfScope := scopeFilter(r)
-	maps, err := s.options.Store.ListPentestMaps(r.Context(), scopeID, includeOutOfScope)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusOK, maps)
-}
-
-func (s *Server) handlePentestMapRebuild(w http.ResponseWriter, r *http.Request) {
-	if s.options.Store == nil {
-		s.handleNotImplemented(w, r)
-		return
-	}
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	var input struct {
-		ScopeID           string `json:"scope_id"`
-		IncludeOutOfScope bool   `json:"include_out_of_scope"`
-		Name              string `json:"name"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil && err != io.EOF {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
-		return
-	}
-	filterScopeID := strings.TrimSpace(input.ScopeID)
-	mapScopeID := filterScopeID
-	if filterScopeID == "__out_of_scope__" {
-		mapScopeID = ""
-	}
-	flows, err := s.loadPentestTrafficDetails(r.Context(), filterScopeID, input.IncludeOutOfScope)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	result := pentest.Analyze(flows, pentest.Options{ScopeID: mapScopeID, IncludeOutOfScope: input.IncludeOutOfScope, Name: input.Name})
-	created, err := s.options.Store.SavePentestMap(r.Context(), result.Map, result.Endpoints, result.Parameters, result.Observations)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	detail, _, err := s.options.Store.GetPentestMapDetail(r.Context(), created.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	s.audit(r, "pentest.map.rebuild", map[string]any{"id": created.ID, "scope_id": created.ScopeID, "source_flow_count": created.SourceFlowCount})
-	writeJSON(w, http.StatusCreated, detail)
-}
-
-func (s *Server) handlePentestMapDetail(w http.ResponseWriter, r *http.Request) {
-	if s.options.Store == nil {
-		s.handleNotImplemented(w, r)
-		return
-	}
-	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/pentest/maps/"), "/")
-	parts := strings.Split(path, "/")
-	if len(parts) == 4 && parts[1] == "endpoints" && parts[3] == "clone" {
-		s.handlePentestEndpointClone(w, r, parts[0], parts[2])
-		return
-	}
-	if len(parts) != 1 || parts[0] == "" {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "pentest map not found"})
-		return
-	}
-	switch r.Method {
-	case http.MethodGet:
-		detail, ok, err := s.options.Store.GetPentestMapDetail(r.Context(), parts[0])
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if !ok {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "pentest map not found"})
-			return
-		}
-		writeJSON(w, http.StatusOK, detail)
-	case http.MethodDelete:
-		if err := s.options.Store.DeletePentestMap(r.Context(), parts[0]); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		s.audit(r, "pentest.map.delete", map[string]any{"id": parts[0]})
-		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
-	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-func (s *Server) handlePentestEndpointClone(w http.ResponseWriter, r *http.Request, mapID, endpointID string) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	endpoint, ok, err := s.options.Store.GetPentestEndpoint(r.Context(), mapID, endpointID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !ok || strings.TrimSpace(endpoint.RepresentativeFlowID) == "" {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "pentest endpoint not found"})
-		return
-	}
-	flow, ok, err := s.options.Store.GetTrafficDetail(r.Context(), endpoint.RepresentativeFlowID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if !ok {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "representative flow not found"})
-		return
-	}
-	c, err := repeaterCaseFromTraffic(flow)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	c.Name = "Pentest " + endpoint.Method + " " + endpoint.NormalizedPath
-	created, err := s.options.Store.CreateRepeaterCase(r.Context(), c)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	s.audit(r, "pentest.endpoint.clone", map[string]any{"map_id": mapID, "endpoint_id": endpointID, "flow_id": flow.ID, "case_id": created.ID})
-	writeJSON(w, http.StatusCreated, created)
-}
-
-func (s *Server) loadPentestTrafficDetails(ctx context.Context, scopeID string, includeOutOfScope bool) ([]store.TrafficDetail, error) {
-	const pageSize = 500
-	var details []store.TrafficDetail
-	for offset := 0; ; offset += pageSize {
-		page, err := s.options.Store.ListTrafficDetailsScopedPage(ctx, pageSize, offset, scopeID, includeOutOfScope, "")
-		if err != nil {
-			return nil, err
-		}
-		details = append(details, page...)
-		if len(page) < pageSize {
-			break
-		}
-	}
-	return details, nil
-}
-
-func (s *Server) handleScopeDetail(w http.ResponseWriter, r *http.Request) {
-	if s.options.Store == nil {
-		s.handleNotImplemented(w, r)
-		return
-	}
-	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/scopes/"), "/")
-	parts := strings.Split(path, "/")
-	if len(parts) == 0 || parts[0] == "" {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "scope not found"})
-		return
-	}
-	id := parts[0]
-	if len(parts) > 1 {
-		s.handleScopeAssignment(w, r, id, parts[1:])
-		return
-	}
-	switch r.Method {
-	case http.MethodGet:
-		scope, ok, err := s.options.Store.GetResearchScope(r.Context(), id)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if !ok {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "scope not found"})
-			return
-		}
-		writeJSON(w, http.StatusOK, scope)
-	case http.MethodPut:
-		var scope store.ResearchScope
-		if err := json.NewDecoder(r.Body).Decode(&scope); err != nil {
-			http.Error(w, "invalid JSON body", http.StatusBadRequest)
-			return
-		}
-		scope.ID = id
-		if strings.TrimSpace(scope.Name) == "" {
-			http.Error(w, "name is required", http.StatusBadRequest)
-			return
-		}
-		updated, err := s.options.Store.UpdateResearchScope(r.Context(), scope)
-		if err == sql.ErrNoRows {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "scope not found"})
-			return
-		}
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		s.audit(r, "scope.update", map[string]any{"id": id})
-		writeJSON(w, http.StatusOK, updated)
-	case http.MethodDelete:
-		if err := s.options.Store.DeleteResearchScope(r.Context(), id); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		s.audit(r, "scope.delete", map[string]any{"id": id})
-		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
-	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-func (s *Server) handleScopeAssignment(w http.ResponseWriter, r *http.Request, scopeID string, parts []string) {
-	if r.Method != http.MethodPost || len(parts) != 3 || parts[0] != "assign" {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown scope action"})
-		return
-	}
-	if _, ok, err := s.options.Store.GetResearchScope(r.Context(), scopeID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	} else if !ok {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "scope not found"})
-		return
-	}
-	targetID := strings.TrimSpace(parts[2])
-	switch parts[1] {
-	case "traffic":
-		if err := s.options.Store.AssignTrafficScope(r.Context(), targetID, scopeID); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	case "repeater":
-		if err := s.options.Store.AssignRepeaterScope(r.Context(), targetID, scopeID); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	default:
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown scope assignment target"})
-		return
-	}
-	s.audit(r, "scope.assign", map[string]any{"scope_id": scopeID, "target": parts[1], "target_id": targetID})
-	writeJSON(w, http.StatusOK, map[string]string{"status": "assigned"})
 }
 
 func (s *Server) handleTrafficDetail(w http.ResponseWriter, r *http.Request) {
@@ -743,8 +447,7 @@ func (s *Server) handleRepeaterCases(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
-		scopeID, includeOutOfScope := scopeFilter(r)
-		cases, err := s.options.Store.ListRepeaterCasesScoped(r.Context(), 200, scopeID, includeOutOfScope)
+		cases, err := s.options.Store.ListRepeaterCases(r.Context(), 200)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -1059,7 +762,6 @@ func (s *Server) handleInterceptPendingDetail(w http.ResponseWriter, r *http.Req
 			Headers:      msg.Headers,
 			Body:         msg.Body,
 			TimeoutMS:    repeaterTimeoutMS,
-			ScopeID:      msg.ScopeID,
 		})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1299,17 +1001,16 @@ func (s *Server) handleFaultTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
-		Phase   string `json:"phase"`
-		Method  string `json:"method"`
-		URL     string `json:"url"`
-		Host    string `json:"host"`
-		ScopeID string `json:"scope_id"`
+		Phase  string `json:"phase"`
+		Method string `json:"method"`
+		URL    string `json:"url"`
+		Host   string `json:"host"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "invalid JSON body", http.StatusBadRequest)
 		return
 	}
-	rule, matched, err := s.options.Store.MatchFaultInjectionRule(r.Context(), input.Phase, store.RequestMatch{Method: input.Method, URL: input.URL, Host: input.Host, ScopeID: input.ScopeID})
+	rule, matched, err := s.options.Store.MatchFaultInjectionRule(r.Context(), input.Phase, store.RequestMatch{Method: input.Method, URL: input.URL, Host: input.Host})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1429,7 +1130,6 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 		Limit:     limit,
 		Offset:    offset,
 		Query:     r.URL.Query().Get("q"),
-		ScopeID:   r.URL.Query().Get("scope_id"),
 		Kind:      r.URL.Query().Get("kind"),
 		Host:      r.URL.Query().Get("host"),
 		RequestID: r.URL.Query().Get("request_id"),
@@ -1478,7 +1178,7 @@ func (s *Server) handleAITraffic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	context := s.trafficAIContext(flow)
-	note, err := s.generateAINote(r.Context(), kind, "traffic", flow.ID, flow.ScopeID, context)
+	note, err := s.generateAINote(r.Context(), kind, "traffic", flow.ID, context)
 	if err != nil {
 		http.Error(w, err.Error(), statusForAIError(err))
 		return
@@ -1535,7 +1235,7 @@ func (s *Server) handleAIRepeater(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown ai action"})
 		return
 	}
-	note, err := s.generateAINote(r.Context(), kind, "repeater_case", c.ID, c.ScopeID, context)
+	note, err := s.generateAINote(r.Context(), kind, "repeater_case", c.ID, context)
 	if err != nil {
 		http.Error(w, err.Error(), statusForAIError(err))
 		return
@@ -1555,7 +1255,6 @@ func (s *Server) handleAINotes(w http.ResponseWriter, r *http.Request) {
 		notes, err := s.options.Store.ListAINotes(r.Context(), store.AINoteFilter{
 			TargetType: r.URL.Query().Get("target_type"),
 			TargetID:   r.URL.Query().Get("target_id"),
-			ScopeID:    r.URL.Query().Get("scope_id"),
 			Limit:      limit,
 		})
 		if err != nil {
@@ -1607,19 +1306,7 @@ func (s *Server) handleAINoteDetail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
-func (s *Server) generateAINote(ctx context.Context, kind, targetType, targetID, scopeID string, evidence any) (store.AINote, error) {
-	if kind == copilot.KindTestSuggestions && strings.TrimSpace(scopeID) == "" {
-		content := json.RawMessage(`{"summary":"This item is out of scope. Passive review only.","safe_manual_tests":[],"parameters_to_review":[],"headers_to_review":[],"scope_warning":"Out-of-scope traffic can be explained, but active testing suggestions are intentionally withheld."}`)
-		return s.options.Store.CreateAINote(ctx, store.AINote{
-			Kind:       kind,
-			TargetType: targetType,
-			TargetID:   targetID,
-			ScopeID:    scopeID,
-			Title:      "AI test suggestions",
-			Summary:    "This item is out of scope. Passive review only.",
-			Content:    content,
-		})
-	}
+func (s *Server) generateAINote(ctx context.Context, kind, targetType, targetID string, evidence any) (store.AINote, error) {
 	cfg := s.options.Config().AICopilot
 	if !cfg.Enabled {
 		return store.AINote{}, fmt.Errorf("AI copilot is disabled; enable ai_copilot.enabled in Settings or config.json and reload the running proxy")
@@ -1636,7 +1323,6 @@ func (s *Server) generateAINote(ctx context.Context, kind, targetType, targetID,
 		Kind:       kind,
 		TargetType: targetType,
 		TargetID:   targetID,
-		ScopeID:    scopeID,
 		Model:      result.Model,
 		PromptHash: result.PromptHash,
 		Title:      result.Title,
@@ -1668,8 +1354,6 @@ func (s *Server) trafficAIContext(flow store.TrafficDetail) map[string]any {
 		cookieNames = append(cookieNames, name)
 	}
 	return map[string]any{
-		"out_of_scope": !isConcreteScopeID(flow.ScopeID),
-		"scope_id":     flow.ScopeID,
 		"request": map[string]any{
 			"id":                  flow.ID,
 			"method":              flow.Method,
@@ -1701,8 +1385,6 @@ func (s *Server) trafficAIContext(flow store.TrafficDetail) map[string]any {
 func (s *Server) repeaterAIContext(c store.RepeaterCase) map[string]any {
 	cfg := s.options.Config().AICopilot
 	return map[string]any{
-		"out_of_scope": !isConcreteScopeID(c.ScopeID),
-		"scope_id":     c.ScopeID,
 		"case": map[string]any{
 			"id":                  c.ID,
 			"name":                c.Name,
@@ -1720,8 +1402,6 @@ func (s *Server) repeaterAIContext(c store.RepeaterCase) map[string]any {
 func (s *Server) repeaterRunComparisonContext(c store.RepeaterCase, current, previous store.RepeaterRun) map[string]any {
 	cfg := s.options.Config().AICopilot
 	return map[string]any{
-		"out_of_scope": !isConcreteScopeID(c.ScopeID),
-		"scope_id":     c.ScopeID,
 		"case": map[string]any{
 			"id":             c.ID,
 			"name":           c.Name,
@@ -1851,10 +1531,6 @@ func redactedStringValues(values []string, redact bool) []string {
 	return out
 }
 
-func isConcreteScopeID(scopeID string) bool {
-	return strings.TrimSpace(scopeID) != "" && strings.TrimSpace(scopeID) != "__out_of_scope__"
-}
-
 func (s *Server) repeaterCaseFromInput(ctx context.Context, input repeaterCaseInput, id string) (store.RepeaterCase, error) {
 	var c store.RepeaterCase
 	if id != "" {
@@ -1907,9 +1583,6 @@ func (s *Server) repeaterCaseFromInput(ctx context.Context, input repeaterCaseIn
 	if input.TimeoutMS != 0 {
 		c.TimeoutMS = input.TimeoutMS
 	}
-	if input.ScopeID != "" {
-		c.ScopeID = strings.TrimSpace(input.ScopeID)
-	}
 	if c.TimeoutMS == 0 {
 		c.TimeoutMS = repeaterTimeoutMS
 	}
@@ -1934,7 +1607,6 @@ func repeaterCaseFromTraffic(flow store.TrafficDetail) (store.RepeaterCase, erro
 		Headers:      map[string][]string{},
 		Body:         flow.RequestBody,
 		TimeoutMS:    repeaterTimeoutMS,
-		ScopeID:      flow.ScopeID,
 	}
 	for _, header := range flow.Headers {
 		if header.Direction != "request" || skipReplayHeader(header.Name) {
@@ -3113,7 +2785,6 @@ func (s *Server) handleProxyACLTest(w http.ResponseWriter, r *http.Request) {
 		URL      string `json:"url"`
 		Host     string `json:"host"`
 		Port     int    `json:"port"`
-		ScopeID  string `json:"scope_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "invalid JSON body", http.StatusBadRequest)
@@ -3128,7 +2799,7 @@ func (s *Server) handleProxyACLTest(w http.ResponseWriter, r *http.Request) {
 		target = host
 	}
 	controller := access.NewController(s.options.Config, s.options.Store)
-	decision := controller.Test(r.Context(), input.Username, net.JoinHostPort(stringDefault(input.RemoteIP, "127.0.0.1"), "12345"), stringDefault(input.Method, http.MethodGet), target, input.ScopeID)
+	decision := controller.Test(r.Context(), input.Username, net.JoinHostPort(stringDefault(input.RemoteIP, "127.0.0.1"), "12345"), stringDefault(input.Method, http.MethodGet), target)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"allowed": decision.Allowed,
 		"rule_id": decision.RuleID,
@@ -3270,43 +2941,10 @@ func (s *Server) handleThreatEvents(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"metrics": threats.Metrics{}, "events": []threats.Event{}})
 		return
 	}
-	eventsOut := s.scopedThreatEvents(r)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"metrics": s.options.ThreatScanner.Metrics(),
-		"events":  eventsOut,
+		"events":  s.options.ThreatScanner.ListEvents(100),
 	})
-}
-
-type scopedThreatEvent struct {
-	threats.Event
-	ScopeID string `json:"scope_id,omitempty"`
-}
-
-func (s *Server) scopedThreatEvents(r *http.Request) []scopedThreatEvent {
-	eventsIn := s.options.ThreatScanner.ListEvents(100)
-	out := make([]scopedThreatEvent, 0, len(eventsIn))
-	scopeID, includeOutOfScope := scopeFilter(r)
-	for _, event := range eventsIn {
-		eventScopeID := ""
-		if s.options.Store != nil {
-			eventScopeID, _ = s.options.Store.MatchResearchScope(r.Context(), event.Method, event.URL, event.Host)
-		}
-		if scopeID == "__out_of_scope__" {
-			if eventScopeID != "" {
-				continue
-			}
-		} else if scopeID != "" {
-			if includeOutOfScope {
-				if eventScopeID != "" && eventScopeID != scopeID {
-					continue
-				}
-			} else if eventScopeID != scopeID {
-				continue
-			}
-		}
-		out = append(out, scopedThreatEvent{Event: event, ScopeID: eventScopeID})
-	}
-	return out
 }
 
 func (s *Server) handleThreatEventDetail(w http.ResponseWriter, r *http.Request) {

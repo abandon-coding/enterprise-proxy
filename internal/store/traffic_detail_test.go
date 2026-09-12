@@ -8,7 +8,7 @@ import (
 	"mitm-proxy/internal/events"
 )
 
-func TestListTrafficDetailsScopedPageLoadsRelatedData(t *testing.T) {
+func TestListTrafficDetailsPageLoadsRelatedData(t *testing.T) {
 	st := openTestStore(t)
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -50,7 +50,7 @@ func TestListTrafficDetailsScopedPageLoadsRelatedData(t *testing.T) {
 		t.Fatalf("record flow 2 start: %v", err)
 	}
 
-	details, err := st.ListTrafficDetailsScopedPage(ctx, 10, 0, "", true, "")
+	details, err := st.ListTrafficDetailsPage(ctx, 10, 0, "")
 	if err != nil {
 		t.Fatalf("list details: %v", err)
 	}

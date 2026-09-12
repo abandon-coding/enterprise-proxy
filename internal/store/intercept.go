@@ -23,7 +23,6 @@ type BreakpointMatch struct {
 	URL         string
 	Host        string
 	Status      int
-	ScopeID     string
 	ContentType string
 }
 
@@ -42,8 +41,8 @@ func (s *Store) CreateInterceptRule(ctx context.Context, rule InterceptRule) (In
 		return InterceptRule{}, err
 	}
 	_, err = s.db.ExecContext(ctx, `INSERT INTO intercept_rules
-		(id, created_at, updated_at, name, enabled, priority, direction, host_patterns_json, method_patterns_json, status_patterns_json, scope_ids_json, content_type_patterns_json)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, args...)
+		(id, created_at, updated_at, name, enabled, priority, direction, host_patterns_json, method_patterns_json, status_patterns_json, content_type_patterns_json)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, args...)
 	if err != nil {
 		return InterceptRule{}, fmt.Errorf("insert intercept rule: %w", err)
 	}
@@ -60,7 +59,7 @@ func (s *Store) UpdateInterceptRule(ctx context.Context, rule InterceptRule) (In
 	args = append(args, rule.ID)
 	res, err := s.db.ExecContext(ctx, `UPDATE intercept_rules SET
 		id = ?, created_at = ?, updated_at = ?, name = ?, enabled = ?, priority = ?, direction = ?,
-		host_patterns_json = ?, method_patterns_json = ?, status_patterns_json = ?, scope_ids_json = ?, content_type_patterns_json = ?
+		host_patterns_json = ?, method_patterns_json = ?, status_patterns_json = ?, content_type_patterns_json = ?
 		WHERE id = ?`, args...)
 	if err != nil {
 		return InterceptRule{}, fmt.Errorf("update intercept rule: %w", err)
@@ -120,9 +119,6 @@ func (s *Store) MatchInterceptRule(ctx context.Context, in BreakpointMatch) (Int
 			continue
 		}
 		if len(rule.StatusPatterns) > 0 && !matchAnyStatusPattern(rule.StatusPatterns, in.Status) {
-			continue
-		}
-		if len(rule.ScopeIDs) > 0 && !containsFold(rule.ScopeIDs, in.ScopeID) {
 			continue
 		}
 		if len(rule.ContentTypePatterns) > 0 && !matchAnyTextPattern(rule.ContentTypePatterns, in.ContentType) {
@@ -228,14 +224,10 @@ func (s *Store) CreateWebSocketConnection(ctx context.Context, c WebSocketConnec
 	if c.CreatedAt.IsZero() {
 		c.CreatedAt = time.Now().UTC()
 	}
-	scopeID, _ := s.MatchResearchScope(ctx, "GET", c.URL, c.Host)
-	if c.ScopeID == "" {
-		c.ScopeID = scopeID
-	}
 	_, err := s.db.ExecContext(ctx, `INSERT INTO websocket_connections
-		(id, created_at, closed_at, url, host, protocol, remote_ip, scope_id, proxy_user)
-		VALUES (?, ?, NULL, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))`,
-		c.ID, c.CreatedAt.Format(time.RFC3339Nano), c.URL, c.Host, c.Protocol, c.RemoteIP, c.ScopeID, c.ProxyUser)
+		(id, created_at, closed_at, url, host, protocol, remote_ip, proxy_user)
+		VALUES (?, ?, NULL, ?, ?, ?, ?, NULLIF(?, ''))`,
+		c.ID, c.CreatedAt.Format(time.RFC3339Nano), c.URL, c.Host, c.Protocol, c.RemoteIP, c.ProxyUser)
 	return c, err
 }
 
@@ -267,7 +259,7 @@ func (s *Store) ListWebSocketConnections(ctx context.Context, limit int) ([]WebS
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT c.id, c.created_at, COALESCE(c.closed_at, ''), c.url, c.host, c.protocol, COALESCE(c.remote_ip, ''), COALESCE(c.scope_id, ''), COALESCE(c.proxy_user, ''), COUNT(f.id)
+	rows, err := s.db.QueryContext(ctx, `SELECT c.id, c.created_at, COALESCE(c.closed_at, ''), c.url, c.host, c.protocol, COALESCE(c.remote_ip, ''), COALESCE(c.proxy_user, ''), COUNT(f.id)
 		FROM websocket_connections c LEFT JOIN websocket_frames f ON f.connection_id = c.id
 		GROUP BY c.id ORDER BY c.created_at DESC LIMIT ?`, limit)
 	if err != nil {
@@ -286,7 +278,7 @@ func (s *Store) ListWebSocketConnections(ctx context.Context, limit int) ([]WebS
 }
 
 func (s *Store) GetWebSocketConnection(ctx context.Context, id string) (WebSocketConnection, bool, error) {
-	row := s.db.QueryRowContext(ctx, `SELECT c.id, c.created_at, COALESCE(c.closed_at, ''), c.url, c.host, c.protocol, COALESCE(c.remote_ip, ''), COALESCE(c.scope_id, ''), COALESCE(c.proxy_user, ''), COUNT(f.id)
+	row := s.db.QueryRowContext(ctx, `SELECT c.id, c.created_at, COALESCE(c.closed_at, ''), c.url, c.host, c.protocol, COALESCE(c.remote_ip, ''), COALESCE(c.proxy_user, ''), COUNT(f.id)
 		FROM websocket_connections c LEFT JOIN websocket_frames f ON f.connection_id = c.id WHERE c.id = ? GROUP BY c.id`, id)
 	c, err := scanWebSocketConnection(row)
 	if err == sql.ErrNoRows {
@@ -336,11 +328,11 @@ func (s *Store) PurgeInterceptAndWebSockets(ctx context.Context) error {
 }
 
 func interceptRuleSelect() string {
-	return `SELECT id, created_at, updated_at, name, enabled, priority, direction, host_patterns_json, method_patterns_json, status_patterns_json, scope_ids_json, content_type_patterns_json FROM intercept_rules`
+	return `SELECT id, created_at, updated_at, name, enabled, priority, direction, host_patterns_json, method_patterns_json, status_patterns_json, content_type_patterns_json FROM intercept_rules`
 }
 
 func interceptRuleSQLArgs(rule InterceptRule) ([]any, error) {
-	lists := [][]string{rule.HostPatterns, rule.MethodPatterns, rule.StatusPatterns, rule.ScopeIDs, rule.ContentTypePatterns}
+	lists := [][]string{rule.HostPatterns, rule.MethodPatterns, rule.StatusPatterns, rule.ContentTypePatterns}
 	encoded := make([]string, 0, len(lists))
 	for _, list := range lists {
 		raw, err := json.Marshal(list)
@@ -351,7 +343,7 @@ func interceptRuleSQLArgs(rule InterceptRule) ([]any, error) {
 	}
 	return []any{
 		rule.ID, rule.CreatedAt.Format(time.RFC3339Nano), rule.UpdatedAt.Format(time.RFC3339Nano), rule.Name,
-		boolInt(rule.Enabled), rule.Priority, rule.Direction, encoded[0], encoded[1], encoded[2], encoded[3], encoded[4],
+		boolInt(rule.Enabled), rule.Priority, rule.Direction, encoded[0], encoded[1], encoded[2], encoded[3],
 	}, nil
 }
 
@@ -371,16 +363,15 @@ func normalizeInterceptRule(rule InterceptRule) InterceptRule {
 	rule.HostPatterns = normalizeStringList(rule.HostPatterns, false)
 	rule.MethodPatterns = normalizeStringList(rule.MethodPatterns, true)
 	rule.StatusPatterns = normalizeStringList(rule.StatusPatterns, false)
-	rule.ScopeIDs = normalizeStringList(rule.ScopeIDs, false)
 	rule.ContentTypePatterns = normalizeStringList(rule.ContentTypePatterns, false)
 	return rule
 }
 
 func scanInterceptRule(row trafficScanner) (InterceptRule, error) {
 	var rule InterceptRule
-	var createdAt, updatedAt, hostJSON, methodJSON, statusJSON, scopeJSON, contentTypeJSON string
+	var createdAt, updatedAt, hostJSON, methodJSON, statusJSON, contentTypeJSON string
 	var enabled int
-	if err := row.Scan(&rule.ID, &createdAt, &updatedAt, &rule.Name, &enabled, &rule.Priority, &rule.Direction, &hostJSON, &methodJSON, &statusJSON, &scopeJSON, &contentTypeJSON); err != nil {
+	if err := row.Scan(&rule.ID, &createdAt, &updatedAt, &rule.Name, &enabled, &rule.Priority, &rule.Direction, &hostJSON, &methodJSON, &statusJSON, &contentTypeJSON); err != nil {
 		return InterceptRule{}, err
 	}
 	rule.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
@@ -389,7 +380,6 @@ func scanInterceptRule(row trafficScanner) (InterceptRule, error) {
 	rule.HostPatterns = unmarshalStringList(hostJSON)
 	rule.MethodPatterns = unmarshalStringList(methodJSON)
 	rule.StatusPatterns = unmarshalStringList(statusJSON)
-	rule.ScopeIDs = unmarshalStringList(scopeJSON)
 	rule.ContentTypePatterns = unmarshalStringList(contentTypeJSON)
 	return normalizeInterceptRule(rule), nil
 }
@@ -440,7 +430,7 @@ func mergeInterceptMessage(base, patch InterceptMessage) InterceptMessage {
 func scanWebSocketConnection(row trafficScanner) (WebSocketConnection, error) {
 	var c WebSocketConnection
 	var createdAt, closedAt string
-	if err := row.Scan(&c.ID, &createdAt, &closedAt, &c.URL, &c.Host, &c.Protocol, &c.RemoteIP, &c.ScopeID, &c.ProxyUser, &c.FrameCount); err != nil {
+	if err := row.Scan(&c.ID, &createdAt, &closedAt, &c.URL, &c.Host, &c.Protocol, &c.RemoteIP, &c.ProxyUser, &c.FrameCount); err != nil {
 		return WebSocketConnection{}, err
 	}
 	c.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
@@ -517,31 +507,28 @@ func matchAnyStatusPattern(patterns []string, status int) bool {
 	return false
 }
 
-func (s *Store) ListTrafficAdvanced(ctx context.Context, limit, offset int, scopeID string, includeOutOfScope bool, query string) ([]TrafficFlow, error) {
+func (s *Store) ListTrafficAdvanced(ctx context.Context, limit, offset int, query string) ([]TrafficFlow, error) {
 	if limit <= 0 || limit > 1000 {
 		limit = 200
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	where, args := scopedWhere(scopeID, includeOutOfScope)
+	where := ""
+	args := []any{}
 	searchWhere, searchArgs, err := trafficSearchWhere(query)
 	if err != nil {
 		return nil, err
 	}
 	if searchWhere != "" {
-		if where == "" {
-			where = " WHERE " + searchWhere
-		} else {
-			where += " AND " + searchWhere
-		}
+		where = " WHERE " + searchWhere
 		args = append(args, searchArgs...)
 	}
 	args = append(args, limit, offset)
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT DISTINCT tf.id, tf.created_at, COALESCE(tf.method, ''), COALESCE(tf.url, ''), COALESCE(tf.host, ''),
 		 COALESCE(tf.status, 0), COALESCE(tf.protocol, ''), COALESCE(tf.mime_type, ''), COALESCE(tf.remote_ip, ''),
-		 COALESCE(tf.duration_ms, 0), COALESCE(tf.bytes, 0), tf.cache_hit, tf.blocked, COALESCE(tf.rule_id, ''), COALESCE(tf.scope_id, ''), COALESCE(tf.proxy_user, '')
+		 COALESCE(tf.duration_ms, 0), COALESCE(tf.bytes, 0), tf.cache_hit, tf.blocked, COALESCE(tf.rule_id, ''), COALESCE(tf.proxy_user, '')
 		 FROM traffic_flows tf`+where+` ORDER BY tf.created_at DESC LIMIT ? OFFSET ?`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query traffic flows: %w", err)
@@ -593,9 +580,6 @@ func trafficSearchWhere(query string) (string, []any, error) {
 			}
 			clauses = append(clauses, clause)
 			args = append(args, val)
-		case "scope":
-			clauses = append(clauses, `COALESCE(tf.scope_id, '') = ?`)
-			args = append(args, value)
 		case "user":
 			clauses = append(clauses, `LOWER(COALESCE(tf.proxy_user, '')) LIKE ?`)
 			args = append(args, term)

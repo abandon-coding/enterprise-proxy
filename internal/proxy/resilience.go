@@ -37,7 +37,7 @@ func (p *Proxy) effectiveConfigForRequest(req *http.Request) *cfgpkg.Config {
 	if p.resilience == nil || req == nil {
 		return cfg
 	}
-	profile, ok, err := p.resilience.MatchHostProfile(req.Context(), requestMatchFromRequest(req, ""))
+	profile, ok, err := p.resilience.MatchHostProfile(req.Context(), requestMatchFromRequest(req))
 	if err != nil || !ok {
 		return cfg
 	}
@@ -88,7 +88,7 @@ func (p *Proxy) applyRequestFault(ctx context.Context, req *http.Request, reques
 	if !p.faultsEnabledForRequest(ctx, req) {
 		return requestFaultResult{}
 	}
-	rule, ok, err := p.resilience.MatchFaultInjectionRule(ctx, "request", requestMatchFromRequest(req, ""))
+	rule, ok, err := p.resilience.MatchFaultInjectionRule(ctx, "request", requestMatchFromRequest(req))
 	if err != nil || !ok {
 		return requestFaultResult{}
 	}
@@ -117,7 +117,7 @@ func (p *Proxy) applyBufferedResponseFault(ctx context.Context, req *http.Reques
 	if !p.faultsEnabledForRequest(ctx, req) {
 		return body
 	}
-	rule, ok, err := p.resilience.MatchFaultInjectionRule(ctx, "response", requestMatchFromRequest(req, ""))
+	rule, ok, err := p.resilience.MatchFaultInjectionRule(ctx, "response", requestMatchFromRequest(req))
 	if err != nil || !ok {
 		return body
 	}
@@ -145,7 +145,7 @@ func (p *Proxy) wrapStreamingResponseFault(ctx context.Context, req *http.Reques
 	if !p.faultsEnabledForRequest(ctx, req) {
 		return
 	}
-	rule, ok, err := p.resilience.MatchFaultInjectionRule(ctx, "response", requestMatchFromRequest(req, ""))
+	rule, ok, err := p.resilience.MatchFaultInjectionRule(ctx, "response", requestMatchFromRequest(req))
 	if err != nil || !ok {
 		return
 	}
@@ -169,7 +169,7 @@ func (p *Proxy) faultsEnabledForRequest(ctx context.Context, req *http.Request) 
 	if p.resilience == nil || req == nil {
 		return true
 	}
-	profile, ok, err := p.resilience.MatchHostProfile(ctx, requestMatchFromRequest(req, ""))
+	profile, ok, err := p.resilience.MatchHostProfile(ctx, requestMatchFromRequest(req))
 	if err != nil || !ok || profile.Overrides.EnableFaults == nil {
 		return true
 	}
@@ -194,7 +194,7 @@ func (p *Proxy) publishFault(rule store.FaultInjectionRule, phase string, req *h
 	p.publish(events.TopicFaultInjected, payload, requestID)
 }
 
-func requestMatchFromRequest(req *http.Request, scopeID string) store.RequestMatch {
+func requestMatchFromRequest(req *http.Request) store.RequestMatch {
 	host := ""
 	rawURL := ""
 	if req != nil && req.URL != nil {
@@ -204,7 +204,7 @@ func requestMatchFromRequest(req *http.Request, scopeID string) store.RequestMat
 	if host == "" && req != nil {
 		host = req.Host
 	}
-	return store.RequestMatch{Method: req.Method, URL: rawURL, Host: host, ScopeID: scopeID}
+	return store.RequestMatch{Method: req.Method, URL: rawURL, Host: host}
 }
 
 func applyHostProfileOverrides(cfg *cfgpkg.Config, overrides store.HostProfileOverrides) {

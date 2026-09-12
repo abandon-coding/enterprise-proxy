@@ -25,7 +25,7 @@
   "admin_store": "dashboard.db",
   "cache": {
     "enabled": true,
-    "directory": "F:\\Cache",
+    "directory": "D:\\Cache",
     "include_domains": [],
     "exclude_domains": [],
     "include_extensions": [

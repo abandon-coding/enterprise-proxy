@@ -25,7 +25,7 @@ func (f *fakeCopilotClient) Generate(ctx context.Context, cfg cfgpkg.AICopilotCo
 	f.evidence = evidence
 	content := json.RawMessage(`{"summary":"AI summary","interesting_observations":["review headers"],"risk_notes":[],"recommended_manual_review":["check auth assumptions"]}`)
 	if kind == copilot.KindTestSuggestions {
-		content = json.RawMessage(`{"summary":"AI suggestions","safe_manual_tests":["vary an allowed parameter"],"parameters_to_review":["id"],"headers_to_review":["accept"],"scope_warning":""}`)
+		content = json.RawMessage(`{"summary":"AI suggestions","safe_manual_tests":["vary an allowed parameter"],"parameters_to_review":["id"],"headers_to_review":["accept"]}`)
 	}
 	if kind == copilot.KindRunComparison {
 		content = json.RawMessage(`{"summary":"AI comparison","meaningful_differences":["status changed"],"possible_causes":["server state"],"next_manual_checks":["confirm reproducibility"]}`)
@@ -65,25 +65,6 @@ func TestAITrafficExplainRedactsAndStoresNote(t *testing.T) {
 	}
 }
 
-func TestAIOutOfScopeSuggestionsDoNotCallModel(t *testing.T) {
-	st := openAdminTestStore(t)
-	flowID := seedSensitiveTrafficFlow(t, st)
-	fake := &fakeCopilotClient{}
-	s := newAITestServer(st, fake)
-
-	data := postForTest(t, s, "/api/ai/traffic/"+flowID+"/suggest-tests", "admin-token")
-	var note store.AINote
-	if err := json.Unmarshal(data, &note); err != nil {
-		t.Fatalf("decode note: %v", err)
-	}
-	if fake.called != 0 {
-		t.Fatalf("out-of-scope suggestions should not call model, got %d calls", fake.called)
-	}
-	if !strings.Contains(string(note.Content), "Out-of-scope") {
-		t.Fatalf("expected out-of-scope guidance, got %s", note.Content)
-	}
-}
-
 func TestAIReadOnlyTokenCannotGenerateOrDelete(t *testing.T) {
 	st := openAdminTestStore(t)
 	flowID := seedSensitiveTrafficFlow(t, st)
@@ -119,7 +100,6 @@ func TestAIRepeaterCompareRunsStoresNote(t *testing.T) {
 		URL:       "https://example.test/",
 		Headers:   map[string][]string{},
 		TimeoutMS: 30000,
-		ScopeID:   "scope-1",
 	})
 	if err != nil {
 		t.Fatalf("create case: %v", err)

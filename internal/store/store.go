@@ -38,15 +38,10 @@ var DashboardTables = []string{
 	"threat_rules",
 	"repeater_cases",
 	"repeater_runs",
-	"research_scopes",
 	"cache_entries",
 	"ai_notes",
 	"proxy_users",
 	"proxy_acl_rules",
-	"pentest_maps",
-	"pentest_endpoints",
-	"pentest_parameters",
-	"pentest_observations",
 	"intercept_rules",
 	"intercept_pending",
 	"websocket_connections",
@@ -94,7 +89,6 @@ type ProxyACLRule struct {
 	HostPatterns   []string  `json:"host_patterns,omitempty"`
 	PortPatterns   []string  `json:"port_patterns,omitempty"`
 	MethodPatterns []string  `json:"method_patterns,omitempty"`
-	ScopeIDs       []string  `json:"scope_ids,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
@@ -114,7 +108,6 @@ type TrafficFlow struct {
 	CacheHit   bool      `json:"cache_hit,omitempty"`
 	Blocked    bool      `json:"blocked,omitempty"`
 	RuleID     string    `json:"rule_id,omitempty"`
-	ScopeID    string    `json:"scope_id,omitempty"`
 	ProxyUser  string    `json:"proxy_user,omitempty"`
 }
 
@@ -162,7 +155,6 @@ type TimelineEntry struct {
 	RequestID    string          `json:"request_id,omitempty"`
 	FlowID       string          `json:"flow_id,omitempty"`
 	ConnectionID string          `json:"connection_id,omitempty"`
-	ScopeID      string          `json:"scope_id,omitempty"`
 	Host         string          `json:"host,omitempty"`
 	Method       string          `json:"method,omitempty"`
 	URL          string          `json:"url,omitempty"`
@@ -177,7 +169,6 @@ type TimelineFilter struct {
 	Limit     int
 	Offset    int
 	Query     string
-	ScopeID   string
 	Kind      string
 	Host      string
 	RequestID string
@@ -194,19 +185,6 @@ type RepeaterCase struct {
 	Headers      map[string][]string `json:"headers"`
 	Body         string              `json:"body"`
 	TimeoutMS    int                 `json:"timeout_ms"`
-	ScopeID      string              `json:"scope_id,omitempty"`
-}
-
-type ResearchScope struct {
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	Description    string    `json:"description,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	Enabled        bool      `json:"enabled"`
-	HostPatterns   []string  `json:"host_patterns"`
-	URLPatterns    []string  `json:"url_patterns"`
-	MethodPatterns []string  `json:"method_patterns"`
 }
 
 type RepeaterRun struct {
@@ -226,71 +204,6 @@ type RepeaterCaseDetail struct {
 	Runs []RepeaterRun `json:"runs"`
 }
 
-type PentestMap struct {
-	ID                string    `json:"id"`
-	ScopeID           string    `json:"scope_id,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
-	Name              string    `json:"name"`
-	SourceFlowCount   int       `json:"source_flow_count"`
-	EndpointCount     int       `json:"endpoint_count"`
-	ParameterCount    int       `json:"parameter_count"`
-	IncludeOutOfScope bool      `json:"include_out_of_scope,omitempty"`
-}
-
-type PentestEndpoint struct {
-	ID                   string         `json:"id"`
-	MapID                string         `json:"map_id"`
-	Method               string         `json:"method"`
-	Scheme               string         `json:"scheme"`
-	Host                 string         `json:"host"`
-	Path                 string         `json:"path"`
-	NormalizedPath       string         `json:"normalized_path"`
-	StatusSummary        map[string]int `json:"status_summary"`
-	ContentTypes         []string       `json:"content_types"`
-	HasAuth              bool           `json:"has_auth"`
-	HasCookies           bool           `json:"has_cookies"`
-	HasRequestBody       bool           `json:"has_request_body"`
-	HasResponseBody      bool           `json:"has_response_body"`
-	CacheHit             bool           `json:"cache_hit"`
-	ProxyUsers           []string       `json:"proxy_users,omitempty"`
-	ParameterCount       int            `json:"parameter_count"`
-	RepresentativeFlowID string         `json:"representative_flow_id,omitempty"`
-}
-
-type PentestParameter struct {
-	ID                   string   `json:"id"`
-	MapID                string   `json:"map_id"`
-	EndpointID           string   `json:"endpoint_id"`
-	Name                 string   `json:"name"`
-	Location             string   `json:"location"`
-	ObservedTypes        []string `json:"observed_types"`
-	Examples             []string `json:"examples,omitempty"`
-	EndpointCount        int      `json:"endpoint_count"`
-	Reflected            bool     `json:"reflected"`
-	Interesting          bool     `json:"interesting"`
-	RepresentativeFlowID string   `json:"representative_flow_id,omitempty"`
-}
-
-type PentestObservation struct {
-	ID                   string          `json:"id"`
-	MapID                string          `json:"map_id"`
-	EndpointID           string          `json:"endpoint_id,omitempty"`
-	Kind                 string          `json:"kind"`
-	Severity             string          `json:"severity"`
-	Title                string          `json:"title"`
-	Summary              string          `json:"summary"`
-	Evidence             json.RawMessage `json:"evidence_json,omitempty"`
-	RepresentativeFlowID string          `json:"representative_flow_id,omitempty"`
-}
-
-type PentestMapDetail struct {
-	Map          PentestMap           `json:"map"`
-	Endpoints    []PentestEndpoint    `json:"endpoints"`
-	Parameters   []PentestParameter   `json:"parameters"`
-	Observations []PentestObservation `json:"observations"`
-}
-
 type AINote struct {
 	ID         string          `json:"id"`
 	CreatedAt  time.Time       `json:"created_at"`
@@ -298,7 +211,6 @@ type AINote struct {
 	Kind       string          `json:"kind"`
 	TargetType string          `json:"target_type"`
 	TargetID   string          `json:"target_id"`
-	ScopeID    string          `json:"scope_id,omitempty"`
 	Model      string          `json:"model,omitempty"`
 	PromptHash string          `json:"prompt_hash,omitempty"`
 	Title      string          `json:"title"`
@@ -317,7 +229,6 @@ type InterceptRule struct {
 	HostPatterns        []string  `json:"host_patterns,omitempty"`
 	MethodPatterns      []string  `json:"method_patterns,omitempty"`
 	StatusPatterns      []string  `json:"status_patterns,omitempty"`
-	ScopeIDs            []string  `json:"scope_ids,omitempty"`
 	ContentTypePatterns []string  `json:"content_type_patterns,omitempty"`
 }
 
@@ -331,7 +242,6 @@ type InterceptMessage struct {
 	Protocol  string              `json:"protocol,omitempty"`
 	MIMEType  string              `json:"mime_type,omitempty"`
 	RemoteIP  string              `json:"remote_ip,omitempty"`
-	ScopeID   string              `json:"scope_id,omitempty"`
 	ProxyUser string              `json:"proxy_user,omitempty"`
 	RuleID    string              `json:"rule_id,omitempty"`
 	Direction string              `json:"direction,omitempty"`
@@ -357,13 +267,12 @@ type PendingIntercept struct {
 
 type WebSocketConnection struct {
 	ID         string     `json:"id"`
-	CreatedAt  time.Time  `json:"created_at"`
+	CreatedAt  time.Time `json:"created_at"`
 	ClosedAt   *time.Time `json:"closed_at,omitempty"`
 	URL        string     `json:"url"`
 	Host       string     `json:"host"`
 	Protocol   string     `json:"protocol"`
 	RemoteIP   string     `json:"remote_ip,omitempty"`
-	ScopeID    string     `json:"scope_id,omitempty"`
 	ProxyUser  string     `json:"proxy_user,omitempty"`
 	FrameCount int        `json:"frame_count,omitempty"`
 }
@@ -384,7 +293,6 @@ type WebSocketFrame struct {
 type AINoteFilter struct {
 	TargetType string
 	TargetID   string
-	ScopeID    string
 	Limit      int
 }
 
@@ -809,17 +717,6 @@ func (s *Store) migrate(ctx context.Context) error {
 			response_body BLOB,
 			error TEXT
 		)`,
-		`CREATE TABLE IF NOT EXISTS research_scopes (
-			id TEXT PRIMARY KEY,
-			name TEXT NOT NULL,
-			description TEXT,
-			created_at TEXT NOT NULL,
-			updated_at TEXT NOT NULL,
-			enabled INTEGER NOT NULL DEFAULT 1,
-			host_patterns_json TEXT NOT NULL,
-			url_patterns_json TEXT NOT NULL,
-			method_patterns_json TEXT NOT NULL
-		)`,
 		`CREATE TABLE IF NOT EXISTS cache_entries (
 			cache_key TEXT PRIMARY KEY,
 			url TEXT NOT NULL,
@@ -839,7 +736,6 @@ func (s *Store) migrate(ctx context.Context) error {
 			kind TEXT NOT NULL,
 			target_type TEXT NOT NULL,
 			target_id TEXT NOT NULL,
-			scope_id TEXT,
 			model TEXT,
 			prompt_hash TEXT,
 			title TEXT NOT NULL,
@@ -867,63 +763,8 @@ func (s *Store) migrate(ctx context.Context) error {
 			host_patterns_json TEXT NOT NULL,
 			port_patterns_json TEXT NOT NULL,
 			method_patterns_json TEXT NOT NULL,
-			scope_ids_json TEXT NOT NULL,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
-		)`,
-		`CREATE TABLE IF NOT EXISTS pentest_maps (
-			id TEXT PRIMARY KEY,
-			scope_id TEXT,
-			created_at TEXT NOT NULL,
-			updated_at TEXT NOT NULL,
-			name TEXT NOT NULL,
-			source_flow_count INTEGER NOT NULL,
-			endpoint_count INTEGER NOT NULL,
-			parameter_count INTEGER NOT NULL,
-			include_out_of_scope INTEGER NOT NULL DEFAULT 0
-		)`,
-		`CREATE TABLE IF NOT EXISTS pentest_endpoints (
-			id TEXT PRIMARY KEY,
-			map_id TEXT NOT NULL,
-			method TEXT NOT NULL,
-			scheme TEXT NOT NULL,
-			host TEXT NOT NULL,
-			path TEXT NOT NULL,
-			normalized_path TEXT NOT NULL,
-			status_summary_json TEXT NOT NULL,
-			content_types_json TEXT NOT NULL,
-			has_auth INTEGER NOT NULL,
-			has_cookies INTEGER NOT NULL,
-			has_request_body INTEGER NOT NULL,
-			has_response_body INTEGER NOT NULL,
-			cache_hit INTEGER NOT NULL,
-			proxy_users_json TEXT NOT NULL,
-			parameter_count INTEGER NOT NULL,
-			representative_flow_id TEXT
-		)`,
-		`CREATE TABLE IF NOT EXISTS pentest_parameters (
-			id TEXT PRIMARY KEY,
-			map_id TEXT NOT NULL,
-			endpoint_id TEXT NOT NULL,
-			name TEXT NOT NULL,
-			location TEXT NOT NULL,
-			observed_types_json TEXT NOT NULL,
-			examples_json TEXT NOT NULL,
-			endpoint_count INTEGER NOT NULL,
-			reflected INTEGER NOT NULL,
-			interesting INTEGER NOT NULL,
-			representative_flow_id TEXT
-		)`,
-		`CREATE TABLE IF NOT EXISTS pentest_observations (
-			id TEXT PRIMARY KEY,
-			map_id TEXT NOT NULL,
-			endpoint_id TEXT,
-			kind TEXT NOT NULL,
-			severity TEXT NOT NULL,
-			title TEXT NOT NULL,
-			summary TEXT NOT NULL,
-			evidence_json TEXT NOT NULL,
-			representative_flow_id TEXT
 		)`,
 		`CREATE TABLE IF NOT EXISTS intercept_rules (
 			id TEXT PRIMARY KEY,
@@ -936,7 +777,6 @@ func (s *Store) migrate(ctx context.Context) error {
 			host_patterns_json TEXT NOT NULL,
 			method_patterns_json TEXT NOT NULL,
 			status_patterns_json TEXT NOT NULL,
-			scope_ids_json TEXT NOT NULL,
 			content_type_patterns_json TEXT NOT NULL
 		)`,
 		`CREATE TABLE IF NOT EXISTS intercept_pending (
@@ -961,7 +801,6 @@ func (s *Store) migrate(ctx context.Context) error {
 			host TEXT NOT NULL,
 			protocol TEXT NOT NULL,
 			remote_ip TEXT,
-			scope_id TEXT,
 			proxy_user TEXT
 		)`,
 		`CREATE TABLE IF NOT EXISTS websocket_frames (
@@ -988,7 +827,6 @@ func (s *Store) migrate(ctx context.Context) error {
 			host_patterns_json TEXT NOT NULL,
 			url_patterns_json TEXT NOT NULL,
 			method_patterns_json TEXT NOT NULL,
-			scope_ids_json TEXT NOT NULL,
 			delay_ms INTEGER NOT NULL DEFAULT 0,
 			throttle_bytes_per_second INTEGER NOT NULL DEFAULT 0,
 			corrupt_probability REAL NOT NULL DEFAULT 0,
@@ -1017,7 +855,6 @@ func (s *Store) migrate(ctx context.Context) error {
 			request_id TEXT,
 			flow_id TEXT,
 			connection_id TEXT,
-			scope_id TEXT,
 			host TEXT,
 			method TEXT,
 			url TEXT,
@@ -1039,10 +876,7 @@ func (s *Store) migrate(ctx context.Context) error {
 	_ = s.addColumnIfMissing(ctx, "traffic_flows", "cache_hit", "INTEGER NOT NULL DEFAULT 0")
 	_ = s.addColumnIfMissing(ctx, "traffic_flows", "blocked", "INTEGER NOT NULL DEFAULT 0")
 	_ = s.addColumnIfMissing(ctx, "traffic_flows", "rule_id", "TEXT")
-	_ = s.addColumnIfMissing(ctx, "traffic_flows", "scope_id", "TEXT")
 	_ = s.addColumnIfMissing(ctx, "traffic_flows", "proxy_user", "TEXT")
-	_ = s.addColumnIfMissing(ctx, "repeater_cases", "scope_id", "TEXT")
-	_ = s.addColumnIfMissing(ctx, "threat_events", "scope_id", "TEXT")
 	_ = s.addColumnIfMissing(ctx, "admin_users", "role", "TEXT NOT NULL DEFAULT 'read'")
 	_, _ = s.db.ExecContext(ctx, `DELETE FROM certificates WHERE id NOT IN (SELECT MAX(id) FROM certificates GROUP BY COALESCE(host, ''))`)
 	_, _ = s.db.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS idx_certificates_host ON certificates(host)`)
@@ -1165,10 +999,10 @@ func (s *Store) CreateAINote(ctx context.Context, note AINote) (AINote, error) {
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO ai_notes (id, created_at, updated_at, kind, target_type, target_id, scope_id, model, prompt_hash, title, summary, content_json)
-		 VALUES (?, ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?)`,
+		`INSERT INTO ai_notes (id, created_at, updated_at, kind, target_type, target_id, model, prompt_hash, title, summary, content_json)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		note.ID, note.CreatedAt.Format(time.RFC3339Nano), note.UpdatedAt.Format(time.RFC3339Nano),
-		note.Kind, note.TargetType, note.TargetID, note.ScopeID, note.Model, note.PromptHash,
+		note.Kind, note.TargetType, note.TargetID, note.Model, note.PromptHash,
 		note.Title, note.Summary, string(note.Content))
 	if err != nil {
 		return AINote{}, fmt.Errorf("insert ai note: %w", err)
@@ -1194,22 +1028,13 @@ func (s *Store) ListAINotes(ctx context.Context, filter AINoteFilter) ([]AINote,
 		where = append(where, "target_id = ?")
 		args = append(args, strings.TrimSpace(filter.TargetID))
 	}
-	if strings.TrimSpace(filter.ScopeID) != "" {
-		scopeID := strings.TrimSpace(filter.ScopeID)
-		if scopeID == "__out_of_scope__" {
-			where = append(where, "(scope_id IS NULL OR scope_id = '')")
-		} else {
-			where = append(where, "scope_id = ?")
-			args = append(args, scopeID)
-		}
-	}
 	clause := ""
 	if len(where) > 0 {
 		clause = " WHERE " + strings.Join(where, " AND ")
 	}
 	args = append(args, limit)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, created_at, updated_at, kind, target_type, target_id, COALESCE(scope_id, ''), COALESCE(model, ''),
+		`SELECT id, created_at, updated_at, kind, target_type, target_id, COALESCE(model, ''),
 		 COALESCE(prompt_hash, ''), title, COALESCE(summary, ''), content_json
 		 FROM ai_notes`+clause+` ORDER BY created_at DESC LIMIT ?`, args...)
 	if err != nil {
@@ -1243,259 +1068,10 @@ func (s *Store) DeleteAINote(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *Store) SavePentestMap(ctx context.Context, m PentestMap, endpoints []PentestEndpoint, parameters []PentestParameter, observations []PentestObservation) (PentestMap, error) {
-	if s == nil {
-		return PentestMap{}, nil
-	}
-	now := time.Now().UTC()
-	if strings.TrimSpace(m.ID) == "" {
-		m.ID = newStoreID()
-	}
-	if m.CreatedAt.IsZero() {
-		m.CreatedAt = now
-	}
-	m.UpdatedAt = now
-	if strings.TrimSpace(m.Name) == "" {
-		m.Name = "Pentest map"
-	}
-	m.SourceFlowCount = maxInt(m.SourceFlowCount, 0)
-	m.EndpointCount = len(endpoints)
-	m.ParameterCount = len(parameters)
-
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return PentestMap{}, err
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO pentest_maps (id, scope_id, created_at, updated_at, name, source_flow_count, endpoint_count, parameter_count, include_out_of_scope)
-		 VALUES (?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?)`,
-		m.ID, strings.TrimSpace(m.ScopeID), m.CreatedAt.Format(time.RFC3339Nano), m.UpdatedAt.Format(time.RFC3339Nano), m.Name, m.SourceFlowCount, m.EndpointCount, m.ParameterCount, boolInt(m.IncludeOutOfScope)); err != nil {
-		return PentestMap{}, fmt.Errorf("insert pentest map: %w", err)
-	}
-
-	for _, endpoint := range endpoints {
-		if strings.TrimSpace(endpoint.ID) == "" {
-			endpoint.ID = newStoreID()
-		}
-		endpoint.MapID = m.ID
-		statusJSON, _ := json.Marshal(endpoint.StatusSummary)
-		contentTypesJSON, _ := json.Marshal(endpoint.ContentTypes)
-		proxyUsersJSON, _ := json.Marshal(endpoint.ProxyUsers)
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO pentest_endpoints
-			 (id, map_id, method, scheme, host, path, normalized_path, status_summary_json, content_types_json, has_auth, has_cookies, has_request_body, has_response_body, cache_hit, proxy_users_json, parameter_count, representative_flow_id)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''))`,
-			endpoint.ID, endpoint.MapID, endpoint.Method, endpoint.Scheme, endpoint.Host, endpoint.Path, endpoint.NormalizedPath, string(statusJSON), string(contentTypesJSON),
-			boolInt(endpoint.HasAuth), boolInt(endpoint.HasCookies), boolInt(endpoint.HasRequestBody), boolInt(endpoint.HasResponseBody), boolInt(endpoint.CacheHit),
-			string(proxyUsersJSON), endpoint.ParameterCount, endpoint.RepresentativeFlowID); err != nil {
-			return PentestMap{}, fmt.Errorf("insert pentest endpoint: %w", err)
-		}
-	}
-
-	for _, parameter := range parameters {
-		if strings.TrimSpace(parameter.ID) == "" {
-			parameter.ID = newStoreID()
-		}
-		parameter.MapID = m.ID
-		observedTypesJSON, _ := json.Marshal(parameter.ObservedTypes)
-		examplesJSON, _ := json.Marshal(parameter.Examples)
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO pentest_parameters
-			 (id, map_id, endpoint_id, name, location, observed_types_json, examples_json, endpoint_count, reflected, interesting, representative_flow_id)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''))`,
-			parameter.ID, parameter.MapID, parameter.EndpointID, parameter.Name, parameter.Location, string(observedTypesJSON), string(examplesJSON),
-			parameter.EndpointCount, boolInt(parameter.Reflected), boolInt(parameter.Interesting), parameter.RepresentativeFlowID); err != nil {
-			return PentestMap{}, fmt.Errorf("insert pentest parameter: %w", err)
-		}
-	}
-
-	for _, observation := range observations {
-		if strings.TrimSpace(observation.ID) == "" {
-			observation.ID = newStoreID()
-		}
-		observation.MapID = m.ID
-		evidence := observation.Evidence
-		if len(evidence) == 0 {
-			evidence = json.RawMessage(`{}`)
-		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO pentest_observations
-			 (id, map_id, endpoint_id, kind, severity, title, summary, evidence_json, representative_flow_id)
-			 VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, NULLIF(?, ''))`,
-			observation.ID, observation.MapID, observation.EndpointID, observation.Kind, observation.Severity, observation.Title, observation.Summary, string(evidence), observation.RepresentativeFlowID); err != nil {
-			return PentestMap{}, fmt.Errorf("insert pentest observation: %w", err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return PentestMap{}, err
-	}
-	return m, nil
-}
-
-func (s *Store) ListPentestMaps(ctx context.Context, scopeID string, includeOutOfScope bool) ([]PentestMap, error) {
-	if s == nil {
-		return nil, nil
-	}
-	where, args := pentestScopeWhere(scopeID, includeOutOfScope)
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, COALESCE(scope_id, ''), created_at, updated_at, name, source_flow_count, endpoint_count, parameter_count, include_out_of_scope
-		 FROM pentest_maps`+where+` ORDER BY updated_at DESC`, args...)
-	if err != nil {
-		return nil, fmt.Errorf("query pentest maps: %w", err)
-	}
-	defer rows.Close()
-	var maps []PentestMap
-	for rows.Next() {
-		m, err := scanPentestMap(rows)
-		if err != nil {
-			return nil, err
-		}
-		maps = append(maps, m)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return maps, nil
-}
-
-func (s *Store) GetPentestMapDetail(ctx context.Context, id string) (PentestMapDetail, bool, error) {
-	if s == nil {
-		return PentestMapDetail{}, false, nil
-	}
-	row := s.db.QueryRowContext(ctx,
-		`SELECT id, COALESCE(scope_id, ''), created_at, updated_at, name, source_flow_count, endpoint_count, parameter_count, include_out_of_scope
-		 FROM pentest_maps WHERE id = ?`, strings.TrimSpace(id))
-	m, err := scanPentestMap(row)
-	if err == sql.ErrNoRows {
-		return PentestMapDetail{}, false, nil
-	}
-	if err != nil {
-		return PentestMapDetail{}, false, err
-	}
-	endpoints, err := s.listPentestEndpoints(ctx, m.ID)
-	if err != nil {
-		return PentestMapDetail{}, false, err
-	}
-	parameters, err := s.listPentestParameters(ctx, m.ID)
-	if err != nil {
-		return PentestMapDetail{}, false, err
-	}
-	observations, err := s.listPentestObservations(ctx, m.ID)
-	if err != nil {
-		return PentestMapDetail{}, false, err
-	}
-	return PentestMapDetail{Map: m, Endpoints: endpoints, Parameters: parameters, Observations: observations}, true, nil
-}
-
-func (s *Store) GetPentestEndpoint(ctx context.Context, mapID, endpointID string) (PentestEndpoint, bool, error) {
-	if s == nil {
-		return PentestEndpoint{}, false, nil
-	}
-	row := s.db.QueryRowContext(ctx,
-		`SELECT id, map_id, method, scheme, host, path, normalized_path, status_summary_json, content_types_json, has_auth, has_cookies, has_request_body, has_response_body, cache_hit, proxy_users_json, parameter_count, COALESCE(representative_flow_id, '')
-		 FROM pentest_endpoints WHERE map_id = ? AND id = ?`, strings.TrimSpace(mapID), strings.TrimSpace(endpointID))
-	endpoint, err := scanPentestEndpoint(row)
-	if err == sql.ErrNoRows {
-		return PentestEndpoint{}, false, nil
-	}
-	if err != nil {
-		return PentestEndpoint{}, false, err
-	}
-	return endpoint, true, nil
-}
-
-func (s *Store) DeletePentestMap(ctx context.Context, id string) error {
-	if s == nil {
-		return nil
-	}
-	id = strings.TrimSpace(id)
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	for _, statement := range []string{
-		`DELETE FROM pentest_observations WHERE map_id = ?`,
-		`DELETE FROM pentest_parameters WHERE map_id = ?`,
-		`DELETE FROM pentest_endpoints WHERE map_id = ?`,
-		`DELETE FROM pentest_maps WHERE id = ?`,
-	} {
-		if _, err := tx.ExecContext(ctx, statement, id); err != nil {
-			return fmt.Errorf("delete pentest map: %w", err)
-		}
-	}
-	return tx.Commit()
-}
-
-func (s *Store) listPentestEndpoints(ctx context.Context, mapID string) ([]PentestEndpoint, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, map_id, method, scheme, host, path, normalized_path, status_summary_json, content_types_json, has_auth, has_cookies, has_request_body, has_response_body, cache_hit, proxy_users_json, parameter_count, COALESCE(representative_flow_id, '')
-		 FROM pentest_endpoints WHERE map_id = ? ORDER BY host, normalized_path, method`, mapID)
-	if err != nil {
-		return nil, fmt.Errorf("query pentest endpoints: %w", err)
-	}
-	defer rows.Close()
-	var endpoints []PentestEndpoint
-	for rows.Next() {
-		endpoint, err := scanPentestEndpoint(rows)
-		if err != nil {
-			return nil, err
-		}
-		endpoints = append(endpoints, endpoint)
-	}
-	return endpoints, rows.Err()
-}
-
-func (s *Store) listPentestParameters(ctx context.Context, mapID string) ([]PentestParameter, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, map_id, endpoint_id, name, location, observed_types_json, examples_json, endpoint_count, reflected, interesting, COALESCE(representative_flow_id, '')
-		 FROM pentest_parameters WHERE map_id = ? ORDER BY interesting DESC, reflected DESC, name, location`, mapID)
-	if err != nil {
-		return nil, fmt.Errorf("query pentest parameters: %w", err)
-	}
-	defer rows.Close()
-	var parameters []PentestParameter
-	for rows.Next() {
-		parameter, err := scanPentestParameter(rows)
-		if err != nil {
-			return nil, err
-		}
-		parameters = append(parameters, parameter)
-	}
-	return parameters, rows.Err()
-}
-
-func (s *Store) listPentestObservations(ctx context.Context, mapID string) ([]PentestObservation, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, map_id, COALESCE(endpoint_id, ''), kind, severity, title, summary, evidence_json, COALESCE(representative_flow_id, '')
-		 FROM pentest_observations WHERE map_id = ? ORDER BY CASE severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END, kind, title`, mapID)
-	if err != nil {
-		return nil, fmt.Errorf("query pentest observations: %w", err)
-	}
-	defer rows.Close()
-	var observations []PentestObservation
-	for rows.Next() {
-		observation, err := scanPentestObservation(rows)
-		if err != nil {
-			return nil, err
-		}
-		observations = append(observations, observation)
-	}
-	return observations, rows.Err()
-}
-
 func normalizeAINote(note AINote) AINote {
 	note.Kind = strings.TrimSpace(note.Kind)
 	note.TargetType = strings.TrimSpace(note.TargetType)
 	note.TargetID = strings.TrimSpace(note.TargetID)
-	note.ScopeID = strings.TrimSpace(note.ScopeID)
 	note.Model = strings.TrimSpace(note.Model)
 	note.PromptHash = strings.TrimSpace(note.PromptHash)
 	note.Title = strings.TrimSpace(note.Title)
@@ -1733,8 +1309,8 @@ func (s *Store) CreateProxyACLRule(ctx context.Context, rule ProxyACLRule) (Prox
 	}
 	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO proxy_acl_rules
-		 (id, priority, enabled, action, name, description, users_json, source_ips_json, host_patterns_json, port_patterns_json, method_patterns_json, scope_ids_json, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, args...)
+		 (id, priority, enabled, action, name, description, users_json, source_ips_json, host_patterns_json, port_patterns_json, method_patterns_json, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, args...)
 	if err != nil {
 		return ProxyACLRule{}, fmt.Errorf("insert proxy acl rule: %w", err)
 	}
@@ -1780,10 +1356,10 @@ func (s *Store) UpdateProxyACLRule(ctx context.Context, rule ProxyACLRule) (Prox
 	if err != nil {
 		return ProxyACLRule{}, err
 	}
-	updateArgs := []any{args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[13], rule.ID}
+	updateArgs := []any{args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[12], rule.ID}
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE proxy_acl_rules
-		 SET priority = ?, enabled = ?, action = ?, name = ?, description = ?, users_json = ?, source_ips_json = ?, host_patterns_json = ?, port_patterns_json = ?, method_patterns_json = ?, scope_ids_json = ?, updated_at = ?
+		 SET priority = ?, enabled = ?, action = ?, name = ?, description = ?, users_json = ?, source_ips_json = ?, host_patterns_json = ?, port_patterns_json = ?, method_patterns_json = ?, updated_at = ?
 		 WHERE id = ?`, updateArgs...)
 	if err != nil {
 		return ProxyACLRule{}, fmt.Errorf("update proxy acl rule: %w", err)
@@ -1840,14 +1416,10 @@ func (s *Store) RecordEvent(ctx context.Context, event events.Event) error {
 }
 
 func (s *Store) ListTraffic(ctx context.Context, limit int) ([]TrafficFlow, error) {
-	return s.ListTrafficScoped(ctx, limit, "", true)
+	return s.ListTrafficPage(ctx, limit, 0, "")
 }
 
-func (s *Store) ListTrafficScoped(ctx context.Context, limit int, scopeID string, includeOutOfScope bool) ([]TrafficFlow, error) {
-	return s.ListTrafficScopedPage(ctx, limit, 0, scopeID, includeOutOfScope, "")
-}
-
-func (s *Store) ListTrafficScopedPage(ctx context.Context, limit, offset int, scopeID string, includeOutOfScope bool, search string) ([]TrafficFlow, error) {
+func (s *Store) ListTrafficPage(ctx context.Context, limit, offset int, search string) ([]TrafficFlow, error) {
 	if limit <= 0 || limit > 1000 {
 		limit = 200
 	}
@@ -1855,14 +1427,11 @@ func (s *Store) ListTrafficScopedPage(ctx context.Context, limit, offset int, sc
 		offset = 0
 	}
 
-	where, args := scopedWhere(scopeID, includeOutOfScope)
+	where := ""
+	args := []any{}
 	if search = strings.TrimSpace(search); search != "" {
 		searchWhere := `(LOWER(COALESCE(method, '')) LIKE ? OR LOWER(COALESCE(url, '')) LIKE ? OR LOWER(COALESCE(host, '')) LIKE ? OR CAST(COALESCE(status, 0) AS TEXT) LIKE ? OR LOWER(COALESCE(protocol, '')) LIKE ? OR LOWER(COALESCE(mime_type, '')) LIKE ? OR LOWER(COALESCE(rule_id, '')) LIKE ? OR LOWER(COALESCE(proxy_user, '')) LIKE ?)`
-		if where == "" {
-			where = " WHERE " + searchWhere
-		} else {
-			where += " AND " + searchWhere
-		}
+		where = " WHERE " + searchWhere
 		term := "%" + strings.ToLower(search) + "%"
 		args = append(args, term, term, term, term, term, term, term, term)
 	}
@@ -1870,7 +1439,7 @@ func (s *Store) ListTrafficScopedPage(ctx context.Context, limit, offset int, sc
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, created_at, COALESCE(method, ''), COALESCE(url, ''), COALESCE(host, ''),
 		 COALESCE(status, 0), COALESCE(protocol, ''), COALESCE(mime_type, ''), COALESCE(remote_ip, ''),
-		 COALESCE(duration_ms, 0), COALESCE(bytes, 0), cache_hit, blocked, COALESCE(rule_id, ''), COALESCE(scope_id, ''), COALESCE(proxy_user, '')
+		 COALESCE(duration_ms, 0), COALESCE(bytes, 0), cache_hit, blocked, COALESCE(rule_id, ''), COALESCE(proxy_user, '')
 		 FROM traffic_flows`+where+` ORDER BY created_at DESC LIMIT ? OFFSET ?`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query traffic flows: %w", err)
@@ -1891,39 +1460,11 @@ func (s *Store) ListTrafficScopedPage(ctx context.Context, limit, offset int, sc
 	return flows, nil
 }
 
-func scopedWhere(scopeID string, includeOutOfScope bool) (string, []any) {
-	scopeID = strings.TrimSpace(scopeID)
-	if scopeID == "" {
-		return "", nil
-	}
-	if scopeID == "__out_of_scope__" {
-		return " WHERE COALESCE(scope_id, '') = ''", nil
-	}
-	if includeOutOfScope {
-		return " WHERE (scope_id = ? OR COALESCE(scope_id, '') = '')", []any{scopeID}
-	}
-	return " WHERE scope_id = ?", []any{scopeID}
-}
-
-func pentestScopeWhere(scopeID string, includeOutOfScope bool) (string, []any) {
-	scopeID = strings.TrimSpace(scopeID)
-	if scopeID == "" {
-		return "", nil
-	}
-	if scopeID == "__out_of_scope__" {
-		return " WHERE COALESCE(scope_id, '') = ''", nil
-	}
-	if includeOutOfScope {
-		return " WHERE (scope_id = ? OR COALESCE(scope_id, '') = '')", []any{scopeID}
-	}
-	return " WHERE scope_id = ?", []any{scopeID}
-}
-
 func (s *Store) GetTraffic(ctx context.Context, id string) (TrafficFlow, bool, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, created_at, COALESCE(method, ''), COALESCE(url, ''), COALESCE(host, ''),
 		 COALESCE(status, 0), COALESCE(protocol, ''), COALESCE(mime_type, ''), COALESCE(remote_ip, ''),
-		 COALESCE(duration_ms, 0), COALESCE(bytes, 0), cache_hit, blocked, COALESCE(rule_id, ''), COALESCE(scope_id, ''), COALESCE(proxy_user, '')
+		 COALESCE(duration_ms, 0), COALESCE(bytes, 0), cache_hit, blocked, COALESCE(rule_id, ''), COALESCE(proxy_user, '')
 		 FROM traffic_flows WHERE id = ?`, id)
 
 	flow, err := scanTrafficFlow(row)
@@ -1953,8 +1494,8 @@ func (s *Store) GetTrafficDetail(ctx context.Context, id string) (TrafficDetail,
 	return trafficDetailFromParts(flow, headers, requestBody, responseBody), true, nil
 }
 
-func (s *Store) ListTrafficDetailsScopedPage(ctx context.Context, limit, offset int, scopeID string, includeOutOfScope bool, search string) ([]TrafficDetail, error) {
-	flows, err := s.ListTrafficScopedPage(ctx, limit, offset, scopeID, includeOutOfScope, search)
+func (s *Store) ListTrafficDetailsPage(ctx context.Context, limit, offset int, search string) ([]TrafficDetail, error) {
+	flows, err := s.ListTrafficPage(ctx, limit, offset, search)
 	if err != nil {
 		return nil, err
 	}
@@ -2176,12 +1717,7 @@ func (s *Store) PurgeResearchData(ctx context.Context, includeCache bool) error 
 		"threat_rules",
 		"repeater_runs",
 		"repeater_cases",
-		"research_scopes",
 		"ai_notes",
-		"pentest_observations",
-		"pentest_parameters",
-		"pentest_endpoints",
-		"pentest_maps",
 	}
 	if includeCache {
 		tables = append(tables, "cache_entries", "proxy_acl_rules", "proxy_users")
@@ -2291,251 +1827,6 @@ func (s *Store) SetSetting(ctx context.Context, key string, value any) error {
 	return nil
 }
 
-func (s *Store) CreateResearchScope(ctx context.Context, scope ResearchScope) (ResearchScope, error) {
-	if s == nil {
-		return scope, nil
-	}
-	if scope.ID == "" {
-		scope.ID = newStoreID()
-	}
-	now := time.Now().UTC()
-	if scope.CreatedAt.IsZero() {
-		scope.CreatedAt = now
-	}
-	scope.UpdatedAt = now
-	scope = normalizeScope(scope)
-	hostJSON, urlJSON, methodJSON, err := marshalScopePatterns(scope)
-	if err != nil {
-		return ResearchScope{}, err
-	}
-	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO research_scopes (id, name, description, created_at, updated_at, enabled, host_patterns_json, url_patterns_json, method_patterns_json)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		scope.ID, scope.Name, scope.Description, scope.CreatedAt.Format(time.RFC3339Nano), scope.UpdatedAt.Format(time.RFC3339Nano),
-		boolInt(scope.Enabled), hostJSON, urlJSON, methodJSON)
-	if err != nil {
-		return ResearchScope{}, fmt.Errorf("insert research scope: %w", err)
-	}
-	return scope, nil
-}
-
-func (s *Store) UpdateResearchScope(ctx context.Context, scope ResearchScope) (ResearchScope, error) {
-	if s == nil {
-		return scope, nil
-	}
-	scope.UpdatedAt = time.Now().UTC()
-	scope = normalizeScope(scope)
-	hostJSON, urlJSON, methodJSON, err := marshalScopePatterns(scope)
-	if err != nil {
-		return ResearchScope{}, err
-	}
-	result, err := s.db.ExecContext(ctx,
-		`UPDATE research_scopes
-		 SET name = ?, description = ?, updated_at = ?, enabled = ?, host_patterns_json = ?, url_patterns_json = ?, method_patterns_json = ?
-		 WHERE id = ?`,
-		scope.Name, scope.Description, scope.UpdatedAt.Format(time.RFC3339Nano), boolInt(scope.Enabled), hostJSON, urlJSON, methodJSON, scope.ID)
-	if err != nil {
-		return ResearchScope{}, fmt.Errorf("update research scope: %w", err)
-	}
-	if rows, _ := result.RowsAffected(); rows == 0 {
-		return ResearchScope{}, sql.ErrNoRows
-	}
-	stored, ok, err := s.GetResearchScope(ctx, scope.ID)
-	if err != nil || !ok {
-		return ResearchScope{}, err
-	}
-	return stored, nil
-}
-
-func (s *Store) ListResearchScopes(ctx context.Context) ([]ResearchScope, error) {
-	if s == nil {
-		return nil, nil
-	}
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, COALESCE(description, ''), created_at, updated_at, enabled,
-		 host_patterns_json, url_patterns_json, method_patterns_json
-		 FROM research_scopes ORDER BY updated_at DESC`)
-	if err != nil {
-		return nil, fmt.Errorf("query research scopes: %w", err)
-	}
-	defer rows.Close()
-
-	scopes := []ResearchScope{}
-	for rows.Next() {
-		scope, err := scanResearchScope(rows)
-		if err != nil {
-			return nil, err
-		}
-		scopes = append(scopes, scope)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate research scopes: %w", err)
-	}
-	return scopes, nil
-}
-
-func (s *Store) GetResearchScope(ctx context.Context, id string) (ResearchScope, bool, error) {
-	if s == nil {
-		return ResearchScope{}, false, nil
-	}
-	row := s.db.QueryRowContext(ctx,
-		`SELECT id, name, COALESCE(description, ''), created_at, updated_at, enabled,
-		 host_patterns_json, url_patterns_json, method_patterns_json
-		 FROM research_scopes WHERE id = ?`, id)
-	scope, err := scanResearchScope(row)
-	if err == sql.ErrNoRows {
-		return ResearchScope{}, false, nil
-	}
-	if err != nil {
-		return ResearchScope{}, false, err
-	}
-	return scope, true, nil
-}
-
-func (s *Store) DeleteResearchScope(ctx context.Context, id string) error {
-	if s == nil {
-		return nil
-	}
-	for _, statement := range []string{
-		`UPDATE traffic_flows SET scope_id = NULL WHERE scope_id = ?`,
-		`UPDATE repeater_cases SET scope_id = NULL WHERE scope_id = ?`,
-		`UPDATE threat_events SET scope_id = NULL WHERE scope_id = ?`,
-		`UPDATE ai_notes SET scope_id = NULL WHERE scope_id = ?`,
-		`UPDATE pentest_maps SET scope_id = NULL WHERE scope_id = ?`,
-		`DELETE FROM research_scopes WHERE id = ?`,
-	} {
-		if _, err := s.db.ExecContext(ctx, statement, id); err != nil {
-			return fmt.Errorf("delete research scope: %w", err)
-		}
-	}
-	return nil
-}
-
-func (s *Store) AssignTrafficScope(ctx context.Context, flowID, scopeID string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE traffic_flows SET scope_id = NULLIF(?, '') WHERE id = ?`, strings.TrimSpace(scopeID), flowID)
-	if err != nil {
-		return fmt.Errorf("assign traffic scope: %w", err)
-	}
-	return nil
-}
-
-func (s *Store) AssignRepeaterScope(ctx context.Context, caseID, scopeID string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE repeater_cases SET scope_id = NULLIF(?, ''), updated_at = ? WHERE id = ?`,
-		strings.TrimSpace(scopeID), time.Now().UTC().Format(time.RFC3339Nano), caseID)
-	if err != nil {
-		return fmt.Errorf("assign repeater scope: %w", err)
-	}
-	return nil
-}
-
-func (s *Store) MatchResearchScope(ctx context.Context, method, rawURL, host string) (string, error) {
-	scopes, err := s.ListResearchScopes(ctx)
-	if err != nil {
-		return "", err
-	}
-	for _, scope := range scopes {
-		if scope.Enabled && scopeMatches(scope, method, rawURL, host) {
-			return scope.ID, nil
-		}
-	}
-	return "", nil
-}
-
-func scopeMatches(scope ResearchScope, method, rawURL, host string) bool {
-	method = strings.ToUpper(strings.TrimSpace(method))
-	host = strings.ToLower(strings.TrimSpace(host))
-	if host == "" {
-		if parsed, err := url.Parse(rawURL); err == nil {
-			host = strings.ToLower(parsed.Hostname())
-		}
-	}
-	if len(scope.MethodPatterns) > 0 && !containsFold(scope.MethodPatterns, method) {
-		return false
-	}
-	hostMatch := len(scope.HostPatterns) == 0
-	for _, pattern := range scope.HostPatterns {
-		if matchHostPattern(pattern, host) {
-			hostMatch = true
-			break
-		}
-	}
-	urlMatch := len(scope.URLPatterns) == 0
-	for _, pattern := range scope.URLPatterns {
-		if strings.Contains(strings.ToLower(rawURL), strings.ToLower(strings.TrimSpace(pattern))) {
-			urlMatch = true
-			break
-		}
-	}
-	return hostMatch && urlMatch
-}
-
-func matchHostPattern(pattern, host string) bool {
-	pattern = strings.ToLower(strings.TrimSpace(pattern))
-	host = strings.ToLower(strings.TrimSpace(host))
-	if pattern == "" || host == "" {
-		return false
-	}
-	if strings.HasPrefix(pattern, "*.") {
-		suffix := strings.TrimPrefix(pattern, "*.")
-		return strings.HasSuffix(host, "."+suffix)
-	}
-	return host == pattern
-}
-
-func containsFold(values []string, target string) bool {
-	for _, value := range values {
-		if strings.EqualFold(strings.TrimSpace(value), target) {
-			return true
-		}
-	}
-	return false
-}
-
-func normalizeScope(scope ResearchScope) ResearchScope {
-	scope.Name = strings.TrimSpace(scope.Name)
-	scope.Description = strings.TrimSpace(scope.Description)
-	scope.HostPatterns = cleanPatterns(scope.HostPatterns, false)
-	scope.URLPatterns = cleanPatterns(scope.URLPatterns, false)
-	scope.MethodPatterns = cleanPatterns(scope.MethodPatterns, true)
-	return scope
-}
-
-func cleanPatterns(values []string, upper bool) []string {
-	out := []string{}
-	seen := map[string]bool{}
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		if upper {
-			value = strings.ToUpper(value)
-		}
-		key := strings.ToLower(value)
-		if !seen[key] {
-			seen[key] = true
-			out = append(out, value)
-		}
-	}
-	return out
-}
-
-func marshalScopePatterns(scope ResearchScope) (string, string, string, error) {
-	hostJSON, err := json.Marshal(scope.HostPatterns)
-	if err != nil {
-		return "", "", "", fmt.Errorf("marshal scope host patterns: %w", err)
-	}
-	urlJSON, err := json.Marshal(scope.URLPatterns)
-	if err != nil {
-		return "", "", "", fmt.Errorf("marshal scope url patterns: %w", err)
-	}
-	methodJSON, err := json.Marshal(scope.MethodPatterns)
-	if err != nil {
-		return "", "", "", fmt.Errorf("marshal scope method patterns: %w", err)
-	}
-	return string(hostJSON), string(urlJSON), string(methodJSON), nil
-}
-
 func (s *Store) CreateRepeaterCase(ctx context.Context, c RepeaterCase) (RepeaterCase, error) {
 	if s == nil {
 		return c, nil
@@ -2556,10 +1847,10 @@ func (s *Store) CreateRepeaterCase(ctx context.Context, c RepeaterCase) (Repeate
 		return RepeaterCase{}, fmt.Errorf("marshal repeater headers: %w", err)
 	}
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO repeater_cases (id, created_at, updated_at, source_flow_id, name, method, url, headers_json, body, timeout_ms, scope_id)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''))`,
+		`INSERT INTO repeater_cases (id, created_at, updated_at, source_flow_id, name, method, url, headers_json, body, timeout_ms)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		c.ID, c.CreatedAt.Format(time.RFC3339Nano), c.UpdatedAt.Format(time.RFC3339Nano), c.SourceFlowID,
-		c.Name, c.Method, c.URL, string(headers), []byte(c.Body), c.TimeoutMS, strings.TrimSpace(c.ScopeID))
+		c.Name, c.Method, c.URL, string(headers), []byte(c.Body), c.TimeoutMS)
 	if err != nil {
 		return RepeaterCase{}, fmt.Errorf("insert repeater case: %w", err)
 	}
@@ -2580,9 +1871,9 @@ func (s *Store) UpdateRepeaterCase(ctx context.Context, c RepeaterCase) (Repeate
 	}
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE repeater_cases
-		 SET updated_at = ?, name = ?, method = ?, url = ?, headers_json = ?, body = ?, timeout_ms = ?, scope_id = NULLIF(?, '')
+		 SET updated_at = ?, name = ?, method = ?, url = ?, headers_json = ?, body = ?, timeout_ms = ?
 		 WHERE id = ?`,
-		c.UpdatedAt.Format(time.RFC3339Nano), c.Name, c.Method, c.URL, string(headers), []byte(c.Body), c.TimeoutMS, strings.TrimSpace(c.ScopeID), c.ID)
+		c.UpdatedAt.Format(time.RFC3339Nano), c.Name, c.Method, c.URL, string(headers), []byte(c.Body), c.TimeoutMS, c.ID)
 	if err != nil {
 		return RepeaterCase{}, fmt.Errorf("update repeater case: %w", err)
 	}
@@ -2597,21 +1888,15 @@ func (s *Store) UpdateRepeaterCase(ctx context.Context, c RepeaterCase) (Repeate
 }
 
 func (s *Store) ListRepeaterCases(ctx context.Context, limit int) ([]RepeaterCase, error) {
-	return s.ListRepeaterCasesScoped(ctx, limit, "", true)
-}
-
-func (s *Store) ListRepeaterCasesScoped(ctx context.Context, limit int, scopeID string, includeOutOfScope bool) ([]RepeaterCase, error) {
 	if s == nil {
 		return nil, nil
 	}
 	if limit <= 0 || limit > 1000 {
 		limit = 200
 	}
-	where, args := scopedWhere(scopeID, includeOutOfScope)
-	args = append(args, limit)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, created_at, updated_at, COALESCE(source_flow_id, ''), name, method, url, headers_json, COALESCE(body, ''), timeout_ms, COALESCE(scope_id, '')
-		 FROM repeater_cases`+where+` ORDER BY updated_at DESC LIMIT ?`, args...)
+		`SELECT id, created_at, updated_at, COALESCE(source_flow_id, ''), name, method, url, headers_json, COALESCE(body, ''), timeout_ms
+		 FROM repeater_cases ORDER BY updated_at DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, fmt.Errorf("query repeater cases: %w", err)
 	}
@@ -2636,7 +1921,7 @@ func (s *Store) GetRepeaterCase(ctx context.Context, id string) (RepeaterCase, b
 		return RepeaterCase{}, false, nil
 	}
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, created_at, updated_at, COALESCE(source_flow_id, ''), name, method, url, headers_json, COALESCE(body, ''), timeout_ms, COALESCE(scope_id, '')
+		`SELECT id, created_at, updated_at, COALESCE(source_flow_id, ''), name, method, url, headers_json, COALESCE(body, ''), timeout_ms
 		 FROM repeater_cases WHERE id = ?`, id)
 	c, err := scanRepeaterCase(row)
 	if err == sql.ErrNoRows {
@@ -2727,7 +2012,7 @@ func scanRepeaterCase(row trafficScanner) (RepeaterCase, error) {
 	var c RepeaterCase
 	var createdAt, updatedAt, headersJSON string
 	var body []byte
-	if err := row.Scan(&c.ID, &createdAt, &updatedAt, &c.SourceFlowID, &c.Name, &c.Method, &c.URL, &headersJSON, &body, &c.TimeoutMS, &c.ScopeID); err != nil {
+	if err := row.Scan(&c.ID, &createdAt, &updatedAt, &c.SourceFlowID, &c.Name, &c.Method, &c.URL, &headersJSON, &body, &c.TimeoutMS); err != nil {
 		return RepeaterCase{}, err
 	}
 	c.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
@@ -2740,23 +2025,6 @@ func scanRepeaterCase(row trafficScanner) (RepeaterCase, error) {
 		c.Headers = map[string][]string{}
 	}
 	return c, nil
-}
-
-func scanResearchScope(row trafficScanner) (ResearchScope, error) {
-	var scope ResearchScope
-	var createdAt, updatedAt string
-	var enabled int
-	var hostJSON, urlJSON, methodJSON string
-	if err := row.Scan(&scope.ID, &scope.Name, &scope.Description, &createdAt, &updatedAt, &enabled, &hostJSON, &urlJSON, &methodJSON); err != nil {
-		return ResearchScope{}, err
-	}
-	scope.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
-	scope.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAt)
-	scope.Enabled = enabled != 0
-	_ = json.Unmarshal([]byte(hostJSON), &scope.HostPatterns)
-	_ = json.Unmarshal([]byte(urlJSON), &scope.URLPatterns)
-	_ = json.Unmarshal([]byte(methodJSON), &scope.MethodPatterns)
-	return normalizeScope(scope), nil
 }
 
 func scanRepeaterRun(row trafficScanner) (RepeaterRun, error) {
@@ -2781,7 +2049,7 @@ func scanAINote(row trafficScanner) (AINote, error) {
 	var note AINote
 	var createdAt, updatedAt, content string
 	if err := row.Scan(&note.ID, &createdAt, &updatedAt, &note.Kind, &note.TargetType, &note.TargetID,
-		&note.ScopeID, &note.Model, &note.PromptHash, &note.Title, &note.Summary, &content); err != nil {
+		&note.Model, &note.PromptHash, &note.Title, &note.Summary, &content); err != nil {
 		return AINote{}, err
 	}
 	note.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
@@ -2791,69 +2059,6 @@ func scanAINote(row trafficScanner) (AINote, error) {
 	}
 	note.Content = json.RawMessage(content)
 	return normalizeAINote(note), nil
-}
-
-func scanPentestMap(row trafficScanner) (PentestMap, error) {
-	var m PentestMap
-	var createdAt, updatedAt string
-	var includeOutOfScope int
-	if err := row.Scan(&m.ID, &m.ScopeID, &createdAt, &updatedAt, &m.Name, &m.SourceFlowCount, &m.EndpointCount, &m.ParameterCount, &includeOutOfScope); err != nil {
-		return PentestMap{}, err
-	}
-	m.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
-	m.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAt)
-	m.IncludeOutOfScope = includeOutOfScope != 0
-	return m, nil
-}
-
-func scanPentestEndpoint(row trafficScanner) (PentestEndpoint, error) {
-	var endpoint PentestEndpoint
-	var statusJSON, contentTypesJSON, proxyUsersJSON string
-	var hasAuth, hasCookies, hasRequestBody, hasResponseBody, cacheHit int
-	if err := row.Scan(&endpoint.ID, &endpoint.MapID, &endpoint.Method, &endpoint.Scheme, &endpoint.Host, &endpoint.Path, &endpoint.NormalizedPath,
-		&statusJSON, &contentTypesJSON, &hasAuth, &hasCookies, &hasRequestBody, &hasResponseBody, &cacheHit, &proxyUsersJSON, &endpoint.ParameterCount, &endpoint.RepresentativeFlowID); err != nil {
-		return PentestEndpoint{}, err
-	}
-	_ = json.Unmarshal([]byte(statusJSON), &endpoint.StatusSummary)
-	_ = json.Unmarshal([]byte(contentTypesJSON), &endpoint.ContentTypes)
-	_ = json.Unmarshal([]byte(proxyUsersJSON), &endpoint.ProxyUsers)
-	if endpoint.StatusSummary == nil {
-		endpoint.StatusSummary = map[string]int{}
-	}
-	endpoint.HasAuth = hasAuth != 0
-	endpoint.HasCookies = hasCookies != 0
-	endpoint.HasRequestBody = hasRequestBody != 0
-	endpoint.HasResponseBody = hasResponseBody != 0
-	endpoint.CacheHit = cacheHit != 0
-	return endpoint, nil
-}
-
-func scanPentestParameter(row trafficScanner) (PentestParameter, error) {
-	var parameter PentestParameter
-	var observedTypesJSON, examplesJSON string
-	var reflected, interesting int
-	if err := row.Scan(&parameter.ID, &parameter.MapID, &parameter.EndpointID, &parameter.Name, &parameter.Location, &observedTypesJSON, &examplesJSON,
-		&parameter.EndpointCount, &reflected, &interesting, &parameter.RepresentativeFlowID); err != nil {
-		return PentestParameter{}, err
-	}
-	_ = json.Unmarshal([]byte(observedTypesJSON), &parameter.ObservedTypes)
-	_ = json.Unmarshal([]byte(examplesJSON), &parameter.Examples)
-	parameter.Reflected = reflected != 0
-	parameter.Interesting = interesting != 0
-	return parameter, nil
-}
-
-func scanPentestObservation(row trafficScanner) (PentestObservation, error) {
-	var observation PentestObservation
-	var evidence string
-	if err := row.Scan(&observation.ID, &observation.MapID, &observation.EndpointID, &observation.Kind, &observation.Severity, &observation.Title, &observation.Summary, &evidence, &observation.RepresentativeFlowID); err != nil {
-		return PentestObservation{}, err
-	}
-	if strings.TrimSpace(evidence) == "" {
-		evidence = "{}"
-	}
-	observation.Evidence = json.RawMessage(evidence)
-	return observation, nil
 }
 
 func scanProxyUser(row trafficScanner) (ProxyUser, error) {
@@ -2873,15 +2078,15 @@ func scanProxyUser(row trafficScanner) (ProxyUser, error) {
 }
 
 func proxyACLRuleSelect() string {
-	return `SELECT id, priority, enabled, action, name, COALESCE(description, ''), users_json, source_ips_json, host_patterns_json, port_patterns_json, method_patterns_json, scope_ids_json, created_at, updated_at FROM proxy_acl_rules`
+	return `SELECT id, priority, enabled, action, name, COALESCE(description, ''), users_json, source_ips_json, host_patterns_json, port_patterns_json, method_patterns_json, created_at, updated_at FROM proxy_acl_rules`
 }
 
 func scanProxyACLRule(row trafficScanner) (ProxyACLRule, error) {
 	var rule ProxyACLRule
 	var enabled int
-	var usersJSON, sourceIPsJSON, hostJSON, portJSON, methodJSON, scopeJSON string
+	var usersJSON, sourceIPsJSON, hostJSON, portJSON, methodJSON string
 	var createdAt, updatedAt string
-	if err := row.Scan(&rule.ID, &rule.Priority, &enabled, &rule.Action, &rule.Name, &rule.Description, &usersJSON, &sourceIPsJSON, &hostJSON, &portJSON, &methodJSON, &scopeJSON, &createdAt, &updatedAt); err != nil {
+	if err := row.Scan(&rule.ID, &rule.Priority, &enabled, &rule.Action, &rule.Name, &rule.Description, &usersJSON, &sourceIPsJSON, &hostJSON, &portJSON, &methodJSON, &createdAt, &updatedAt); err != nil {
 		return ProxyACLRule{}, err
 	}
 	rule.Enabled = enabled != 0
@@ -2890,7 +2095,6 @@ func scanProxyACLRule(row trafficScanner) (ProxyACLRule, error) {
 	rule.HostPatterns = unmarshalStringList(hostJSON)
 	rule.PortPatterns = unmarshalStringList(portJSON)
 	rule.MethodPatterns = unmarshalStringList(methodJSON)
-	rule.ScopeIDs = unmarshalStringList(scopeJSON)
 	rule.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
 	rule.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAt)
 	return normalizeProxyACLRule(rule), nil
@@ -2912,7 +2116,6 @@ func normalizeProxyACLRule(rule ProxyACLRule) ProxyACLRule {
 	rule.HostPatterns = normalizeStringList(rule.HostPatterns, true)
 	rule.PortPatterns = normalizeStringList(rule.PortPatterns, false)
 	rule.MethodPatterns = normalizeStringList(rule.MethodPatterns, true)
-	rule.ScopeIDs = normalizeStringList(rule.ScopeIDs, false)
 	return rule
 }
 
@@ -2941,7 +2144,7 @@ func proxyACLRuleSQLArgs(rule ProxyACLRule) ([]any, error) {
 	if rule.Action != "allow" && rule.Action != "deny" {
 		return nil, fmt.Errorf("proxy ACL action must be allow or deny")
 	}
-	lists := [][]string{rule.Users, rule.SourceIPs, rule.HostPatterns, rule.PortPatterns, rule.MethodPatterns, rule.ScopeIDs}
+	lists := [][]string{rule.Users, rule.SourceIPs, rule.HostPatterns, rule.PortPatterns, rule.MethodPatterns}
 	encoded := make([]string, 0, len(lists))
 	for _, list := range lists {
 		raw, err := json.Marshal(list)
@@ -2956,7 +2159,7 @@ func proxyACLRuleSQLArgs(rule ProxyACLRule) ([]any, error) {
 	}
 	return []any{
 		rule.ID, rule.Priority, enabled, rule.Action, rule.Name, rule.Description,
-		encoded[0], encoded[1], encoded[2], encoded[3], encoded[4], encoded[5],
+		encoded[0], encoded[1], encoded[2], encoded[3], encoded[4],
 		rule.CreatedAt.Format(time.RFC3339Nano), rule.UpdatedAt.Format(time.RFC3339Nano),
 	}, nil
 }
@@ -2971,7 +2174,7 @@ func scanTrafficFlow(row trafficScanner) (TrafficFlow, error) {
 	var flow TrafficFlow
 	var createdAt string
 	var cacheHit, blocked int
-	if err := row.Scan(&flow.ID, &createdAt, &flow.Method, &flow.URL, &flow.Host, &flow.Status, &flow.Protocol, &flow.MIMEType, &flow.RemoteIP, &flow.DurationMS, &flow.Bytes, &cacheHit, &blocked, &flow.RuleID, &flow.ScopeID, &flow.ProxyUser); err != nil {
+	if err := row.Scan(&flow.ID, &createdAt, &flow.Method, &flow.URL, &flow.Host, &flow.Status, &flow.Protocol, &flow.MIMEType, &flow.RemoteIP, &flow.DurationMS, &flow.Bytes, &cacheHit, &blocked, &flow.RuleID, &flow.ProxyUser); err != nil {
 		return TrafficFlow{}, err
 	}
 	flow.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
@@ -2984,15 +2187,11 @@ func (s *Store) recordTrafficStarted(ctx context.Context, event events.Event) er
 	method := stringPayload(event, "method")
 	rawURL := stringPayload(event, "url")
 	host := stringPayload(event, "host")
-	scopeID, err := s.MatchResearchScope(ctx, method, rawURL, host)
-	if err != nil {
-		return fmt.Errorf("match traffic scope: %w", err)
-	}
-	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO traffic_flows (id, created_at, method, url, host, protocol, remote_ip, scope_id, proxy_user)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))
-		 ON CONFLICT(id) DO UPDATE SET method=excluded.method, url=excluded.url, host=excluded.host, protocol=excluded.protocol, remote_ip=excluded.remote_ip, scope_id=excluded.scope_id, proxy_user=COALESCE(excluded.proxy_user, traffic_flows.proxy_user)`,
-		flowID(event), event.Time.Format(time.RFC3339Nano), method, rawURL, host, stringPayload(event, "protocol"), stringPayload(event, "remote_ip"), scopeID, stringPayload(event, "proxy_user"))
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO traffic_flows (id, created_at, method, url, host, protocol, remote_ip, proxy_user)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''))
+		 ON CONFLICT(id) DO UPDATE SET method=excluded.method, url=excluded.url, host=excluded.host, protocol=excluded.protocol, remote_ip=excluded.remote_ip, proxy_user=COALESCE(excluded.proxy_user, traffic_flows.proxy_user)`,
+		flowID(event), event.Time.Format(time.RFC3339Nano), method, rawURL, host, stringPayload(event, "protocol"), stringPayload(event, "remote_ip"), stringPayload(event, "proxy_user"))
 	if err != nil {
 		return fmt.Errorf("record traffic start: %w", err)
 	}
@@ -3006,15 +2205,11 @@ func (s *Store) recordTrafficCompleted(ctx context.Context, event events.Event) 
 	method := stringPayload(event, "method")
 	rawURL := stringPayload(event, "url")
 	host := stringPayload(event, "host")
-	scopeID, err := s.MatchResearchScope(ctx, method, rawURL, host)
-	if err != nil {
-		return fmt.Errorf("match traffic scope: %w", err)
-	}
-	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO traffic_flows (id, created_at, method, url, host, status, mime_type, duration_ms, bytes, cache_hit, scope_id, proxy_user)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))
-		 ON CONFLICT(id) DO UPDATE SET status=excluded.status, mime_type=excluded.mime_type, duration_ms=excluded.duration_ms, bytes=excluded.bytes, cache_hit=excluded.cache_hit, scope_id=COALESCE(excluded.scope_id, traffic_flows.scope_id), proxy_user=COALESCE(excluded.proxy_user, traffic_flows.proxy_user)`,
-		flowID(event), event.Time.Format(time.RFC3339Nano), method, rawURL, host, intPayload(event, "status"), stringPayload(event, "mime_type"), intPayload(event, "duration_ms"), intPayload(event, "bytes"), boolPayload(event, "cache_hit"), scopeID, stringPayload(event, "proxy_user"))
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO traffic_flows (id, created_at, method, url, host, status, mime_type, duration_ms, bytes, cache_hit, proxy_user)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''))
+		 ON CONFLICT(id) DO UPDATE SET status=excluded.status, mime_type=excluded.mime_type, duration_ms=excluded.duration_ms, bytes=excluded.bytes, cache_hit=excluded.cache_hit, proxy_user=COALESCE(excluded.proxy_user, traffic_flows.proxy_user)`,
+		flowID(event), event.Time.Format(time.RFC3339Nano), method, rawURL, host, intPayload(event, "status"), stringPayload(event, "mime_type"), intPayload(event, "duration_ms"), intPayload(event, "bytes"), boolPayload(event, "cache_hit"), stringPayload(event, "proxy_user"))
 	if err != nil {
 		return fmt.Errorf("record traffic completion: %w", err)
 	}
@@ -3030,14 +2225,10 @@ func (s *Store) recordTunnelOpened(ctx context.Context, event events.Event) erro
 	if parsed, err := url.Parse("//" + target); err == nil {
 		host = parsed.Hostname()
 	}
-	scopeID, err := s.MatchResearchScope(ctx, "CONNECT", target, host)
-	if err != nil {
-		return fmt.Errorf("match tunnel scope: %w", err)
-	}
-	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO traffic_flows (id, created_at, method, url, host, protocol, remote_ip, scope_id, proxy_user)
-		 VALUES (?, ?, 'CONNECT', ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))`,
-		flowID(event), event.Time.Format(time.RFC3339Nano), target, host, stringPayload(event, "protocol"), stringPayload(event, "remote_ip"), scopeID, stringPayload(event, "proxy_user"))
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO traffic_flows (id, created_at, method, url, host, protocol, remote_ip, proxy_user)
+		 VALUES (?, ?, 'CONNECT', ?, ?, ?, ?, NULLIF(?, ''))`,
+		flowID(event), event.Time.Format(time.RFC3339Nano), target, host, stringPayload(event, "protocol"), stringPayload(event, "remote_ip"), stringPayload(event, "proxy_user"))
 	if err != nil {
 		return fmt.Errorf("record tunnel: %w", err)
 	}
@@ -3087,19 +2278,15 @@ func (s *Store) recordTrafficBlocked(ctx context.Context, event events.Event) er
 	method := stringPayload(event, "method")
 	rawURL := firstStringPayload(event, "url", "target")
 	host := stringPayload(event, "host")
-	scopeID, err := s.MatchResearchScope(ctx, method, rawURL, host)
-	if err != nil {
-		return fmt.Errorf("match blocked traffic scope: %w", err)
-	}
 	status := intPayload(event, "status")
 	if status == 0 {
 		status = 403
 	}
-	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO traffic_flows (id, created_at, method, url, host, blocked, rule_id, status, scope_id, proxy_user, remote_ip)
-		 VALUES (?, ?, ?, ?, ?, 1, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''))
-		 ON CONFLICT(id) DO UPDATE SET blocked=1, rule_id=excluded.rule_id, status=excluded.status, scope_id=excluded.scope_id, proxy_user=COALESCE(excluded.proxy_user, traffic_flows.proxy_user), remote_ip=COALESCE(excluded.remote_ip, traffic_flows.remote_ip)`,
-		flowID(event), event.Time.Format(time.RFC3339Nano), method, rawURL, host, stringPayload(event, "rule_id"), status, scopeID, stringPayload(event, "proxy_user"), stringPayload(event, "remote_ip"))
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO traffic_flows (id, created_at, method, url, host, blocked, rule_id, status, proxy_user, remote_ip)
+		 VALUES (?, ?, ?, ?, ?, 1, ?, ?, NULLIF(?, ''), NULLIF(?, ''))
+		 ON CONFLICT(id) DO UPDATE SET blocked=1, rule_id=excluded.rule_id, status=excluded.status, proxy_user=COALESCE(excluded.proxy_user, traffic_flows.proxy_user), remote_ip=COALESCE(excluded.remote_ip, traffic_flows.remote_ip)`,
+		flowID(event), event.Time.Format(time.RFC3339Nano), method, rawURL, host, stringPayload(event, "rule_id"), status, stringPayload(event, "proxy_user"), stringPayload(event, "remote_ip"))
 	if err != nil {
 		return fmt.Errorf("record blocked traffic: %w", err)
 	}

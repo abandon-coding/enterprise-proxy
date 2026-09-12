@@ -24,7 +24,6 @@ type Store interface {
 	GetProxyUserByUsername(context.Context, string) (store.ProxyUser, bool, error)
 	TouchProxyUserLastUsed(context.Context, string) error
 	ListProxyACLRules(context.Context) ([]store.ProxyACLRule, error)
-	MatchResearchScope(context.Context, string, string, string) (string, error)
 }
 
 type Controller struct {
@@ -39,7 +38,6 @@ type RequestInfo struct {
 	Port       int    `json:"port"`
 	RemoteIP   string `json:"remote_ip"`
 	Username   string `json:"username,omitempty"`
-	ScopeID    string `json:"scope_id,omitempty"`
 	RuleID     string `json:"rule_id,omitempty"`
 	RuleName   string `json:"rule_name,omitempty"`
 	Action     string `json:"action"`
@@ -105,14 +103,10 @@ func (c *Controller) Authorize(ctx context.Context, proxyAuthorization, remoteAd
 	return c.authorize(ctx, username, password, remoteAddr, method, target, ok)
 }
 
-func (c *Controller) Test(ctx context.Context, username, remoteAddr, method, target, scopeID string) Decision {
+func (c *Controller) Test(ctx context.Context, username, remoteAddr, method, target string) Decision {
 	cfg := c.config()
 	info := requestInfo(method, target, remoteAddr)
 	info.Username = strings.TrimSpace(username)
-	info.ScopeID = strings.TrimSpace(scopeID)
-	if info.ScopeID == "" && c.store != nil {
-		info.ScopeID, _ = c.store.MatchResearchScope(ctx, info.Method, info.URL, info.Host)
-	}
 	rule, matched, err := c.matchRule(ctx, info.Username, info)
 	if err != nil {
 		info.Action = "deny"
@@ -164,8 +158,6 @@ func (c *Controller) authorize(ctx context.Context, username, password, remoteAd
 		return Decision{Allowed: false, StatusCode: http.StatusProxyAuthRequired, AuthNeeded: true, Reason: info.Reason, Info: info}
 	}
 	info.Username = user.Username
-	scopeID, _ := c.store.MatchResearchScope(ctx, method, info.URL, info.Host)
-	info.ScopeID = scopeID
 	rule, matched, err := c.matchRule(ctx, user.Username, info)
 	if err != nil {
 		info.Action = "deny"
@@ -218,8 +210,7 @@ func ruleMatches(rule store.ProxyACLRule, username string, info RequestInfo) boo
 		ipListMatches(rule.SourceIPs, info.RemoteIP) &&
 		hostListMatches(rule.HostPatterns, info.Host) &&
 		portListMatches(rule.PortPatterns, info.Port) &&
-		stringListMatches(rule.MethodPatterns, info.Method, true) &&
-		scopeListMatches(rule.ScopeIDs, info.ScopeID)
+		stringListMatches(rule.MethodPatterns, info.Method, true)
 }
 
 func requestInfo(method, target, remoteAddr string) RequestInfo {
@@ -525,22 +516,6 @@ func stringListMatches(values []string, candidate string, upper bool) bool {
 			value = strings.ToUpper(strings.TrimSpace(value))
 		}
 		if strings.EqualFold(strings.TrimSpace(value), candidate) {
-			return true
-		}
-	}
-	return false
-}
-
-func scopeListMatches(values []string, scopeID string) bool {
-	if len(values) == 0 {
-		return true
-	}
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value == "__out_of_scope__" && strings.TrimSpace(scopeID) == "" {
-			return true
-		}
-		if value == scopeID {
 			return true
 		}
 	}

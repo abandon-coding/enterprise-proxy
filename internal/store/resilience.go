@@ -14,10 +14,9 @@ import (
 )
 
 type RequestMatch struct {
-	Method  string `json:"method"`
-	URL     string `json:"url"`
-	Host    string `json:"host"`
-	ScopeID string `json:"scope_id,omitempty"`
+	Method string `json:"method"`
+	URL    string `json:"url"`
+	Host   string `json:"host"`
 }
 
 type FaultInjectionRule struct {
@@ -32,7 +31,6 @@ type FaultInjectionRule struct {
 	HostPatterns           []string            `json:"host_patterns"`
 	URLPatterns            []string            `json:"url_patterns"`
 	MethodPatterns         []string            `json:"method_patterns"`
-	ScopeIDs               []string            `json:"scope_ids"`
 	DelayMS                int                 `json:"delay_ms"`
 	ThrottleBytesPerSecond int                 `json:"throttle_bytes_per_second"`
 	CorruptProbability     float64             `json:"corrupt_probability"`
@@ -85,9 +83,9 @@ func (s *Store) CreateFaultInjectionRule(ctx context.Context, rule FaultInjectio
 		return FaultInjectionRule{}, err
 	}
 	_, err = s.db.ExecContext(ctx, `INSERT INTO fault_injection_rules
-		(id, created_at, updated_at, name, enabled, priority, phase, action, host_patterns_json, url_patterns_json, method_patterns_json, scope_ids_json,
+		(id, created_at, updated_at, name, enabled, priority, phase, action, host_patterns_json, url_patterns_json, method_patterns_json,
 		 delay_ms, throttle_bytes_per_second, corrupt_probability, corrupt_mode, synthetic_status, synthetic_headers_json, synthetic_body)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, args...)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, args...)
 	if err != nil {
 		return FaultInjectionRule{}, fmt.Errorf("insert fault rule: %w", err)
 	}
@@ -104,7 +102,7 @@ func (s *Store) UpdateFaultInjectionRule(ctx context.Context, rule FaultInjectio
 	args = append(args, rule.ID)
 	res, err := s.db.ExecContext(ctx, `UPDATE fault_injection_rules SET
 		id = ?, created_at = ?, updated_at = ?, name = ?, enabled = ?, priority = ?, phase = ?, action = ?,
-		host_patterns_json = ?, url_patterns_json = ?, method_patterns_json = ?, scope_ids_json = ?,
+		host_patterns_json = ?, url_patterns_json = ?, method_patterns_json = ?,
 		delay_ms = ?, throttle_bytes_per_second = ?, corrupt_probability = ?, corrupt_mode = ?, synthetic_status = ?, synthetic_headers_json = ?, synthetic_body = ?
 		WHERE id = ?`, args...)
 	if err != nil {
@@ -145,7 +143,7 @@ func (s *Store) MatchFaultInjectionRule(ctx context.Context, phase string, in Re
 	}
 	phase = strings.ToLower(strings.TrimSpace(phase))
 	for _, rule := range rules {
-		if !rule.Enabled || rule.Phase != phase || !ruleMatches(rule.HostPatterns, rule.URLPatterns, rule.MethodPatterns, rule.ScopeIDs, in) {
+		if !rule.Enabled || rule.Phase != phase || !ruleMatches(rule.HostPatterns, rule.URLPatterns, rule.MethodPatterns, in) {
 			continue
 		}
 		return rule, true, nil
@@ -225,7 +223,7 @@ func (s *Store) MatchHostProfile(ctx context.Context, in RequestMatch) (HostProf
 		return HostProfile{}, false, err
 	}
 	for _, profile := range profiles {
-		if !profile.Enabled || !ruleMatches(profile.HostPatterns, profile.URLPatterns, profile.MethodPatterns, nil, in) {
+		if !profile.Enabled || !ruleMatches(profile.HostPatterns, profile.URLPatterns, profile.MethodPatterns, in) {
 			continue
 		}
 		return profile, true, nil
@@ -244,9 +242,9 @@ func (s *Store) AddTimelineEntry(ctx context.Context, entry TimelineEntry) (Time
 		entry.Metadata = json.RawMessage(`{}`)
 	}
 	_, err := s.db.ExecContext(ctx, `INSERT INTO timeline_entries
-		(id, created_at, kind, topic, request_id, flow_id, connection_id, scope_id, host, method, url, status, duration_ms, summary, severity, metadata_json)
-		VALUES (?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), ?)`,
-		entry.ID, entry.CreatedAt.Format(time.RFC3339Nano), entry.Kind, entry.Topic, entry.RequestID, entry.FlowID, entry.ConnectionID, entry.ScopeID,
+		(id, created_at, kind, topic, request_id, flow_id, connection_id, host, method, url, status, duration_ms, summary, severity, metadata_json)
+		VALUES (?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), ?)`,
+		entry.ID, entry.CreatedAt.Format(time.RFC3339Nano), entry.Kind, entry.Topic, entry.RequestID, entry.FlowID, entry.ConnectionID,
 		entry.Host, entry.Method, entry.URL, entry.Status, entry.DurationMS, entry.Summary, entry.Severity, string(entry.Metadata))
 	if err != nil {
 		return TimelineEntry{}, fmt.Errorf("insert timeline entry: %w", err)
@@ -258,10 +256,6 @@ func (s *Store) RecordTimelineEvent(ctx context.Context, event events.Event) (Ti
 	entry, ok := timelineEntryFromEvent(event)
 	if !ok {
 		return TimelineEntry{}, false, nil
-	}
-	if entry.ScopeID == "" && (entry.URL != "" || entry.Host != "") {
-		scopeID, _ := s.MatchResearchScope(ctx, entry.Method, entry.URL, entry.Host)
-		entry.ScopeID = scopeID
 	}
 	created, err := s.AddTimelineEntry(ctx, entry)
 	return created, true, err
@@ -276,14 +270,6 @@ func (s *Store) ListTimelineEntries(ctx context.Context, filter TimelineFilter) 
 	}
 	clauses := []string{}
 	args := []any{}
-	if filter.ScopeID != "" {
-		if filter.ScopeID == "__out_of_scope__" {
-			clauses = append(clauses, `COALESCE(scope_id, '') = ''`)
-		} else {
-			clauses = append(clauses, `scope_id = ?`)
-			args = append(args, filter.ScopeID)
-		}
-	}
 	if filter.Kind != "" {
 		clauses = append(clauses, `kind = ?`)
 		args = append(args, filter.Kind)
@@ -358,7 +344,7 @@ func normalizeHostProfile(profile HostProfile) HostProfile {
 	return profile
 }
 
-func ruleMatches(hostPatterns, urlPatterns, methodPatterns, scopeIDs []string, in RequestMatch) bool {
+func ruleMatches(hostPatterns, urlPatterns, methodPatterns []string, in RequestMatch) bool {
 	host := in.Host
 	if host == "" && in.URL != "" {
 		if parsed, err := url.Parse(in.URL); err == nil {
@@ -372,9 +358,6 @@ func ruleMatches(hostPatterns, urlPatterns, methodPatterns, scopeIDs []string, i
 		return false
 	}
 	if len(methodPatterns) > 0 && !matchAnyTextPattern(methodPatterns, strings.ToUpper(in.Method)) {
-		return false
-	}
-	if len(scopeIDs) > 0 && !containsFold(scopeIDs, in.ScopeID) {
 		return false
 	}
 	return true
@@ -393,17 +376,13 @@ func faultRuleSQLArgs(rule FaultInjectionRule) ([]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	scopeIDs, err := marshalJSON(rule.ScopeIDs)
-	if err != nil {
-		return nil, err
-	}
 	headers, err := marshalJSON(rule.SyntheticHeaders)
 	if err != nil {
 		return nil, err
 	}
 	return []any{
 		rule.ID, rule.CreatedAt.Format(time.RFC3339Nano), rule.UpdatedAt.Format(time.RFC3339Nano), rule.Name, boolInt(rule.Enabled),
-		rule.Priority, rule.Phase, rule.Action, hostPatterns, urlPatterns, methodPatterns, scopeIDs, rule.DelayMS, rule.ThrottleBytesPerSecond,
+		rule.Priority, rule.Phase, rule.Action, hostPatterns, urlPatterns, methodPatterns, rule.DelayMS, rule.ThrottleBytesPerSecond,
 		rule.CorruptProbability, rule.CorruptMode, rule.SyntheticStatus, headers, rule.SyntheticBody,
 	}, nil
 }
@@ -432,7 +411,7 @@ func hostProfileSQLArgs(profile HostProfile) ([]any, error) {
 }
 
 func faultRuleSelect() string {
-	return `SELECT id, created_at, updated_at, name, enabled, priority, phase, action, host_patterns_json, url_patterns_json, method_patterns_json, scope_ids_json,
+	return `SELECT id, created_at, updated_at, name, enabled, priority, phase, action, host_patterns_json, url_patterns_json, method_patterns_json,
 		delay_ms, throttle_bytes_per_second, corrupt_probability, COALESCE(corrupt_mode, ''), synthetic_status, synthetic_headers_json, COALESCE(synthetic_body, '')
 		FROM fault_injection_rules`
 }
@@ -442,7 +421,7 @@ func hostProfileSelect() string {
 }
 
 func timelineSelect() string {
-	return `SELECT id, created_at, kind, topic, COALESCE(request_id, ''), COALESCE(flow_id, ''), COALESCE(connection_id, ''), COALESCE(scope_id, ''),
+	return `SELECT id, created_at, kind, topic, COALESCE(request_id, ''), COALESCE(flow_id, ''), COALESCE(connection_id, ''),
 		COALESCE(host, ''), COALESCE(method, ''), COALESCE(url, ''), COALESCE(status, 0), COALESCE(duration_ms, 0), summary, COALESCE(severity, ''), metadata_json
 		FROM timeline_entries`
 }
@@ -450,9 +429,9 @@ func timelineSelect() string {
 func scanFaultRule(row any) (FaultInjectionRule, error) {
 	scanner := row.(interface{ Scan(...any) error })
 	var rule FaultInjectionRule
-	var createdAt, updatedAt, hostPatterns, urlPatterns, methodPatterns, scopeIDs, headers string
+	var createdAt, updatedAt, hostPatterns, urlPatterns, methodPatterns, headers string
 	var enabled int
-	if err := scanner.Scan(&rule.ID, &createdAt, &updatedAt, &rule.Name, &enabled, &rule.Priority, &rule.Phase, &rule.Action, &hostPatterns, &urlPatterns, &methodPatterns, &scopeIDs,
+	if err := scanner.Scan(&rule.ID, &createdAt, &updatedAt, &rule.Name, &enabled, &rule.Priority, &rule.Phase, &rule.Action, &hostPatterns, &urlPatterns, &methodPatterns,
 		&rule.DelayMS, &rule.ThrottleBytesPerSecond, &rule.CorruptProbability, &rule.CorruptMode, &rule.SyntheticStatus, &headers, &rule.SyntheticBody); err != nil {
 		return FaultInjectionRule{}, err
 	}
@@ -462,7 +441,6 @@ func scanFaultRule(row any) (FaultInjectionRule, error) {
 	rule.HostPatterns = unmarshalStringList(hostPatterns)
 	rule.URLPatterns = unmarshalStringList(urlPatterns)
 	rule.MethodPatterns = unmarshalStringList(methodPatterns)
-	rule.ScopeIDs = unmarshalStringList(scopeIDs)
 	rule.SyntheticHeaders = map[string][]string{}
 	_ = json.Unmarshal([]byte(headers), &rule.SyntheticHeaders)
 	return rule, nil
@@ -490,7 +468,7 @@ func scanTimelineEntry(row any) (TimelineEntry, error) {
 	scanner := row.(interface{ Scan(...any) error })
 	var entry TimelineEntry
 	var createdAt, metadata string
-	if err := scanner.Scan(&entry.ID, &createdAt, &entry.Kind, &entry.Topic, &entry.RequestID, &entry.FlowID, &entry.ConnectionID, &entry.ScopeID,
+	if err := scanner.Scan(&entry.ID, &createdAt, &entry.Kind, &entry.Topic, &entry.RequestID, &entry.FlowID, &entry.ConnectionID,
 		&entry.Host, &entry.Method, &entry.URL, &entry.Status, &entry.DurationMS, &entry.Summary, &entry.Severity, &metadata); err != nil {
 		return TimelineEntry{}, err
 	}

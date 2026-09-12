@@ -14,7 +14,6 @@ func TestAINotesCreateListDeleteAndFilter(t *testing.T) {
 		Kind:       "explanation",
 		TargetType: "traffic",
 		TargetID:   "flow-1",
-		ScopeID:    "scope-1",
 		Model:      "gpt-test",
 		PromptHash: "abc",
 		Title:      "Traffic explanation",
@@ -34,20 +33,12 @@ func TestAINotesCreateListDeleteAndFilter(t *testing.T) {
 		t.Fatalf("create second note: %v", err)
 	}
 
-	trafficNotes, err := st.ListAINotes(ctx, AINoteFilter{TargetType: "traffic", ScopeID: "scope-1"})
+	trafficNotes, err := st.ListAINotes(ctx, AINoteFilter{TargetType: "traffic"})
 	if err != nil {
 		t.Fatalf("list traffic notes: %v", err)
 	}
 	if len(trafficNotes) != 1 || trafficNotes[0].ID != first.ID || trafficNotes[0].Summary != "summary" {
 		t.Fatalf("unexpected traffic notes: %+v", trafficNotes)
-	}
-
-	outOfScope, err := st.ListAINotes(ctx, AINoteFilter{ScopeID: "__out_of_scope__"})
-	if err != nil {
-		t.Fatalf("list out-of-scope notes: %v", err)
-	}
-	if len(outOfScope) != 1 || outOfScope[0].TargetType != "repeater_case" {
-		t.Fatalf("unexpected out-of-scope notes: %+v", outOfScope)
 	}
 
 	if err := st.DeleteAINote(ctx, first.ID); err != nil {

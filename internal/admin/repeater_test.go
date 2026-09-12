@@ -375,3 +375,27 @@ func postForTest(t *testing.T, s *Server, path, token string) []byte {
 	}
 	return rr.Body.Bytes()
 }
+
+func getForTest(t *testing.T, s *Server, path string) []byte {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
+	rr := httptest.NewRecorder()
+	s.server.Handler.ServeHTTP(rr, req)
+	if rr.Code < 200 || rr.Code >= 300 {
+		t.Fatalf("GET %s got %d: %s", path, rr.Code, rr.Body.String())
+	}
+	return rr.Body.Bytes()
+}
+
+func getRecorderForTest(t *testing.T, s *Server, path string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
+	rr := httptest.NewRecorder()
+	s.server.Handler.ServeHTTP(rr, req)
+	if rr.Code < 200 || rr.Code >= 300 {
+		t.Fatalf("GET %s got %d: %s", path, rr.Code, rr.Body.String())
+	}
+	return rr
+}

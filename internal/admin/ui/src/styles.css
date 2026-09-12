@@ -114,22 +114,6 @@ body {
   box-shadow: 0 0 0 4px rgba(18, 169, 142, 0.13);
 }
 
-.scope-select {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--fg-2);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.scope-select select {
-  width: 220px;
-  min-height: 32px;
-  padding: 5px 9px;
-  font-size: 13px;
-}
-
 .shell {
   display: grid;
   grid-template-columns: 244px minmax(0, 1fr);
@@ -1400,11 +1384,5 @@ textarea {
   .env-pill,
   .status-pill {
     padding-inline: 9px;
-  }
-  .scope-select {
-    flex: 1 1 220px;
-  }
-  .scope-select select {
-    width: 100%;
   }
 }

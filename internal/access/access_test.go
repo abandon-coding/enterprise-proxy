@@ -26,10 +26,6 @@ func (f *fakeStore) ListProxyACLRules(context.Context) ([]store.ProxyACLRule, er
 	return f.rules, nil
 }
 
-func (f *fakeStore) MatchResearchScope(context.Context, string, string, string) (string, error) {
-	return "", nil
-}
-
 func TestBasicAuthAndACLDecisions(t *testing.T) {
 	hash, err := HashPassword("secret")
 	if err != nil {
